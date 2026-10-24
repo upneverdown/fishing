@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 
-export default defineConfig({ base: '/fishing/',
+export default defineConfig({base: './',
   plugins: [viteBasepath(), react(), tailwindcss()],
   resolve: {
     alias: {
