@@ -101,12 +101,51 @@ const UNDERWATER_SHALLOW = new THREE.Color('#2b7f83')
 const UNDERWATER_DEEP = new THREE.Color('#031a24')
 const UNDERWATER_SCATTER = new THREE.Color('#58d6c4')
 
+const STORM_BG = new THREE.Color('#0a1418')
+const STORM_FOG = new THREE.Color('#13252a')
+const STORM_ZENITH = new THREE.Color('#0d161b')
+const STORM_HORIZON = new THREE.Color('#26383b')
+const STORM_HEMI = new THREE.Color('#4b6a72')
+const STORM_SUN = new THREE.Color('#7d97a4')
+const FLASH_COLOR = new THREE.Color('#dff8ff')
+
+function lightningTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 512
+  const ctx = canvas.getContext('2d')!
+  ctx.clearRect(0, 0, 256, 512)
+  ctx.strokeStyle = '#f2fdff'
+  ctx.shadowColor = '#9ff3ff'
+  ctx.shadowBlur = 26
+  ctx.lineWidth = 9
+  ctx.lineJoin = 'round'
+  const points: { x: number; y: number }[] = []
+  let x = 128
+  for (let y = 4; y <= 496; y += 28) {
+    x += (Math.random() - 0.5) * 74
+    x = Math.max(18, Math.min(238, x))
+    points.push({ x, y })
+  }
+  ctx.beginPath()
+  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)))
+  ctx.stroke()
+  ctx.shadowBlur = 10
+  ctx.lineWidth = 3
+  ctx.strokeStyle = '#ffffff'
+  ctx.stroke()
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 export class World {
   readonly water: Water
   readonly foam: Foam
 
   private buoys: Buoy[]
   private waterfallMaterial: THREE.ShaderMaterial
+  private waterfallUpdate: (time: number, dt: number) => void
   private hemi: THREE.HemisphereLight
   private sun: THREE.DirectionalLight
   private fill: THREE.DirectionalLight
@@ -116,6 +155,12 @@ export class World {
   private lilies: THREE.InstancedMesh
   private ice: IceFloeField
   private diveLight: THREE.PointLight
+  private lightningLight: THREE.PointLight
+  private lightningSprite: THREE.Sprite
+  private lightningFlash = 0
+  private lightningOffset = new THREE.Vector3()
+  private storm = 0
+  private stormTarget = 0
 
   private seasonId: SeasonId = 'spring'
   private look: SeasonLook
@@ -161,6 +206,27 @@ export class World {
     const waterfall = createWaterfall()
     scene.add(waterfall.group)
     this.waterfallMaterial = waterfall.material
+    this.waterfallUpdate = waterfall.update
+
+    this.lightningLight = new THREE.PointLight('#dff6ff', 0, 320, 2)
+    this.lightningLight.position.set(0, 45, 0)
+    scene.add(this.lightningLight)
+
+    const boltTexture = lightningTexture()
+    const boltMaterial = new THREE.SpriteMaterial({
+      map: boltTexture,
+      color: '#f2fdff',
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    })
+    this.lightningSprite = new THREE.Sprite(boltMaterial)
+    this.lightningSprite.scale.set(46, 92, 1)
+    this.lightningSprite.visible = false
+    this.lightningSprite.renderOrder = 8
+    scene.add(this.lightningSprite)
 
     this.buoys = createBuoys()
     for (const buoy of this.buoys) scene.add(buoy.group)
@@ -232,6 +298,24 @@ export class World {
 
   setDiveLightPosition(position: THREE.Vector3) {
     this.diveLight.position.copy(position)
+  }
+
+  setStorm(strength: number) {
+    this.stormTarget = THREE.MathUtils.clamp(strength, 0, 1)
+  }
+
+  get stormStrength() {
+    return this.storm
+  }
+
+  flashLightning(power = 1) {
+    this.lightningFlash = Math.max(this.lightningFlash, THREE.MathUtils.clamp(power, 0.25, 1.3))
+    this.lightningOffset.set((Math.random() - 0.5) * 90, 0, (Math.random() - 0.5) * 90)
+    const material = this.lightningSprite.material as THREE.SpriteMaterial
+    material.opacity = 1
+    this.lightningSprite.visible = true
+    this.lightningSprite.scale.set(34 + Math.random() * 28, 80 + Math.random() * 46, 1)
+    this.lightningSprite.material.rotation = (Math.random() - 0.5) * 0.16
   }
 
   private lerpLook(dt: number) {
@@ -325,16 +409,53 @@ export class World {
       this.water.setWaveScale(look.waveScale)
       this.water.setSun(this.sunDir, look.sun)
     }
+
+    if (!this.underwater && this.storm > 0.002) {
+      const s = this.storm
+      background.lerp(STORM_BG, s * 0.78)
+      fog.color.lerp(STORM_FOG, s * 0.76)
+      const uniforms = this.sky.material.uniforms
+      ;(uniforms.uZenith.value as THREE.Color).copy(look.zenith).lerp(STORM_ZENITH, s)
+      ;(uniforms.uHorizon.value as THREE.Color).copy(look.horizon).lerp(STORM_HORIZON, s)
+      ;(uniforms.uSunColor.value as THREE.Color).copy(look.skySun).lerp(STORM_SUN, s * 0.9)
+      this.hemi.color.copy(look.hemiSky).lerp(STORM_HEMI, s * 0.72)
+      this.hemi.intensity *= 1 - s * 0.5
+      this.sun.color.copy(look.sun).lerp(STORM_SUN, s * 0.85)
+      this.sun.intensity *= 1 - s * 0.72
+      this.fill.intensity *= 1 - s * 0.5
+    }
+
+    if (this.lightningFlash > 0.01 && !this.underwater) {
+      this.hemi.intensity += this.lightningFlash * 3.4
+      this.sun.intensity += this.lightningFlash * 2.2
+      background.lerp(FLASH_COLOR, this.lightningFlash * 0.3)
+      fog.color.lerp(FLASH_COLOR, this.lightningFlash * 0.12)
+    }
   }
 
   update(time: number, dt: number, center: THREE.Vector3) {
     this.time = time
+    this.storm += (this.stormTarget - this.storm) * (1 - Math.exp(-dt * 1.7))
+    this.lightningFlash = Math.max(0, this.lightningFlash - dt * 2.6)
     this.lerpLook(dt)
     this.applyScene(center)
 
     this.water.setTime(time)
     this.waterfallMaterial.uniforms.uTime.value = time
+    this.waterfallUpdate(time, dt)
     this.sky.material.uniforms.uTime.value = time
+
+    this.lightningLight.position.copy(center).add(this.lightningOffset)
+    this.lightningLight.position.y += 42
+    this.lightningLight.intensity = this.lightningFlash * 900
+    this.lightningSprite.position.copy(center).add(this.lightningOffset)
+    this.lightningSprite.position.y += 36
+    ;(this.lightningSprite.material as THREE.SpriteMaterial).opacity = this.lightningFlash
+    this.lightningSprite.visible = this.lightningFlash > 0.02
+
+    if (this.storm > 0.01) {
+      this.water.setFogRange(4, 118)
+    }
 
     for (const buoy of this.buoys) {
       const wave = this.water.waveHeight(buoy.x, buoy.z, time)

@@ -347,9 +347,18 @@ export class UnderwaterWorld {
   }
 
   update(time: number, dt: number, center: THREE.Vector3) {
+    this.group.visible = true
+    this.simulate(time, dt, center)
+  }
+
+  /** Keeps fish roaming under the boat while the player is on the surface, without revealing the underwater group. */
+  updateAmbient(time: number, dt: number, center: THREE.Vector3) {
+    this.simulate(time, dt, center)
+  }
+
+  private simulate(time: number, dt: number, center: THREE.Vector3) {
     this.lastTime = time
     this.regenerateDecor(center)
-    this.group.visible = true
 
     if (this.reserves.length) {
       const ready = this.reserves.filter((r) => time >= r.at)

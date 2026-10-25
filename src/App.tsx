@@ -1,6 +1,8 @@
 import { AnimatePresence } from 'motion/react'
 import { GameCanvas } from '@/components/GameCanvas'
 import { Hud } from '@/components/Hud'
+import { CombatHud } from '@/components/CombatHud'
+import { Minimap } from '@/components/Minimap'
 import { PromptBar } from '@/components/PromptBar'
 import { PowerMeter } from '@/components/PowerMeter'
 import { FightOverlay } from '@/components/FightOverlay'
@@ -20,6 +22,12 @@ import { TownDialog } from '@/components/TownDialog'
 import { NpcDialog } from '@/components/NpcDialog'
 import { CaptureResultDialog } from '@/components/CaptureResultDialog'
 import { RareMoment } from '@/components/RareMoment'
+import { CookingSystem } from '@/components/CookingSystem'
+import { LightningOverlay } from '@/components/LightningOverlay'
+import { AchievementToast } from '@/components/AchievementToast'
+import { AchievementsPanel } from '@/components/AchievementsPanel'
+import { CrewPanel } from '@/components/CrewPanel'
+import { SeaEventHud } from '@/components/SeaEventHud'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 
@@ -39,6 +47,8 @@ export default function App() {
       {started && (
         <>
           <Hud />
+          <CombatHud />
+          {!underwater && <Minimap />}
           {!underwater && (
             <>
               <PromptBar />
@@ -48,6 +58,8 @@ export default function App() {
             </>
           )}
           <Toasts />
+          <AchievementToast />
+          <SeaEventHud />
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (
@@ -68,6 +80,10 @@ export default function App() {
       <NpcDialog />
       <CaptureResultDialog />
       <RareMoment />
+      <CookingSystem />
+      <LightningOverlay />
+      <AchievementsPanel />
+      <CrewPanel />
 
       <AnimatePresence>
         {!started && <IntroScreen onStart={() => undefined} />}

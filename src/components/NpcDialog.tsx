@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Gift, Sparkles, X } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { motion } from 'motion/react'
 import { useGameStore } from '@/store/useGameStore'
 import { npcById, type DialogueAction, type DialogueCondition, type DialogueOption } from '@/game/town/npcs'
 import { SEASONS } from '@/game/world/seasons'
-import { parseDishKey } from '@/game/cooking/recipes'
 import { cn } from '@/lib/utils'
 
 function conditionOk(cond: DialogueCondition | undefined, state: ReturnType<typeof useGameStore.getState>) {
@@ -25,6 +24,7 @@ export function NpcDialog() {
   const setTownOpen = useGameStore((s) => s.setTownOpen)
   const setTownTab = useGameStore((s) => s.setTownTab)
   const openMarket = useGameStore((s) => s.openMarket)
+  const setCrewOpen = useGameStore((s) => s.setCrewOpen)
   const npcGift = useGameStore((s) => s.npcGift)
   const season = useGameStore((s) => s.season)
   const npc = npcById(npcId)
@@ -38,6 +38,15 @@ export function NpcDialog() {
     setNodeId(npc.root)
     setGiftNote(null)
   }, [npcId, npc?.root, npc])
+
+  useEffect(() => {
+    if (!npc) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeNpc()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [npc, closeNpc])
 
   const text = node?.text ?? ''
   const full = !node || shown.length >= text.length
@@ -97,66 +106,78 @@ export function NpcDialog() {
       setTownOpen(true)
       setTownTab('cabin')
     }
+    if (action.type === 'crew') {
+      closeNpc()
+      setCrewOpen(true)
+    }
   }
 
   return (
-    <Dialog open={Boolean(npc)} onOpenChange={(v) => !v && closeNpc()}>
-      <DialogContent
-        showClose={false}
-        className="w-[calc(100%-1.5rem)] max-w-lg overflow-hidden border-border/70 bg-[#0a2326] p-0"
+    <div className="fixed inset-0 z-[71] flex flex-col justify-end">
+      <button
+        type="button"
+        onClick={closeNpc}
+        aria-label="结束对话"
+        className="absolute inset-0 bg-gradient-to-t from-abyss/85 via-abyss/30 to-transparent"
+      />
+      <motion.section
+        initial={{ y: 64, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+        className="relative max-h-[76dvh] w-full overflow-y-auto border-t border-gold/30 bg-[#082123]/97 px-3 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-30px_90px_-30px_rgba(0,0,0,0.95)] backdrop-blur-xl sm:px-6"
       >
-        <div className="relative overflow-hidden border-b border-border/50 px-4 pb-3 pt-4">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-60"
-            style={{ background: `radial-gradient(ellipse at 14% 0%, ${npc.color}38, transparent 62%)` }}
-          />
-          <div className="relative flex items-start gap-3">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-50"
+          style={{ background: `radial-gradient(ellipse at 12% 0%, ${npc.color}38, transparent 58%)` }}
+        />
+        <div className="relative mx-auto w-full max-w-3xl">
+          <div className="flex items-start gap-3">
             <div
-              className="relative grid size-14 shrink-0 place-items-center rounded-full text-[20px] font-semibold"
+              className="relative grid size-12 shrink-0 place-items-center rounded-full text-[18px] font-semibold"
               style={{ background: `${npc.color}26`, color: npc.accent, border: `1px solid ${npc.color}55` }}
             >
               {npc.name.slice(-1)}
               <span
-                className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#0a2326]"
+                className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#082123]"
                 style={{ background: npc.accent }}
               />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <DialogTitle className="text-[16px] font-semibold tracking-wide text-foam">{npc.name}</DialogTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[15.5px] font-semibold tracking-wide text-foam">{npc.name}</h2>
                 <span
                   className="rounded-full px-1.5 py-0.5 text-[8.5px] font-medium"
                   style={{ background: `${npc.color}22`, color: npc.accent }}
                 >
                   {npc.role}
                 </span>
+                <span className="flex items-center gap-1 text-[8.5px] text-foam/30">
+                  <Sparkles className="size-2.5" />
+                  {SEASONS[season].name}
+                </span>
               </div>
-              <DialogDescription className="mt-0.5 text-[9.5px] text-foam/40">{npc.tagline}</DialogDescription>
-              <div className="mt-1 flex items-center gap-1 text-[9px] text-foam/30">
-                <Sparkles className="size-2.5" />
-                {SEASONS[season].name} · {npc.greetings[season]}
-              </div>
+              <p className="mt-0.5 truncate text-[9.5px] text-foam/40">{npc.tagline}</p>
             </div>
             <button
               type="button"
               onClick={closeNpc}
-              className="grid size-7 shrink-0 place-items-center rounded-full text-foam/40 transition-colors hover:bg-foam/8 hover:text-foam"
+              className="grid size-8 shrink-0 place-items-center rounded-full text-foam/40 transition-colors hover:bg-foam/8 hover:text-foam"
               aria-label="结束对话"
             >
-              <X className="size-3.5" />
+              <X className="size-4" />
             </button>
           </div>
-        </div>
 
-        <div className="px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setShown(text)}
-            className="min-h-[64px] w-full cursor-default text-left text-[12px] leading-[1.75] text-foam/80"
-          >
-            {shown}
-            {!full && <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-tide/70 align-middle" />}
-          </button>
+          <div className="mt-2.5 rounded-xl border border-border/40 bg-black/22 px-3 py-2.5">
+            <button
+              type="button"
+              onClick={() => setShown(text)}
+              className="min-h-[42px] w-full cursor-default text-left text-[12.5px] leading-[1.8] text-foam/85"
+            >
+              {shown}
+              {!full && <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-tide/70 align-middle" />}
+            </button>
+          </div>
 
           {giftNote && (
             <div className="mt-2 flex items-center gap-1.5 rounded-md bg-gold/10 px-2.5 py-1.5 text-[10px] text-gold">
@@ -165,7 +186,7 @@ export function NpcDialog() {
             </div>
           )}
 
-          <div className="mt-3 flex flex-col gap-1.5">
+          <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
             {full &&
               options.map((option, i) => (
                 <button
@@ -173,10 +194,10 @@ export function NpcDialog() {
                   type="button"
                   onClick={() => run(option)}
                   className={cn(
-                    'group flex items-center gap-2 rounded-lg border border-border/45 bg-card/40 px-3 py-2 text-left text-[11px] text-foam/75 transition-colors hover:border-tide/40 hover:bg-tide/6 hover:text-foam',
+                    'group flex items-center gap-2 rounded-lg border border-border/45 bg-card/50 px-3 py-2 text-left text-[11px] text-foam/80 transition-colors hover:border-tide/40 hover:bg-tide/8 hover:text-foam',
                   )}
                 >
-                  <ArrowRight className="size-3 shrink-0 text-tide/50 transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight className="size-3 shrink-0 text-tide/55 transition-transform group-hover:translate-x-0.5" />
                   <span className="flex-1">{option.label}</span>
                   {option.note && <span className="text-[8.5px] text-foam/25">{option.note}</span>}
                 </button>
@@ -185,14 +206,18 @@ export function NpcDialog() {
               <button
                 type="button"
                 onClick={() => setShown(text)}
-                className="self-end text-[9px] text-foam/30 hover:text-foam/60"
+                className="justify-self-end text-[9px] text-foam/30 hover:text-foam/60"
               >
                 跳过 ›
               </button>
             )}
           </div>
+
+          <div className="mt-2 text-center text-[8px] tracking-[0.16em] text-foam/20">
+            点击空白处或按 ESC 结束对话
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </motion.section>
+    </div>
   )
 }

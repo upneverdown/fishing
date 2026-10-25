@@ -10,15 +10,14 @@ import {
   MapPinned,
   ScanEye,
   Ship,
+  Trophy,
+  Users,
+  Video,
   Volume2,
   VolumeX,
   Waves,
 } from 'lucide-react'
-import {
-  BAG_CAPACITY,
-  UNDERWATER_MODE_LABEL,
-  useGameStore,
-} from '@/store/useGameStore'
+import { UNDERWATER_MODE_LABEL, bagCapacity, useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 import { audio } from '@/game/audio/gameAudio'
 import { baitById } from '@/game/fishing/baitTable'
@@ -49,6 +48,8 @@ function UnderwaterBar() {
   const cycleUnderwaterMode = useGameStore((s) => s.cycleUnderwaterMode)
   const setBaitOpen = useGameStore((s) => s.setBaitOpen)
   const setSeasonOpen = useGameStore((s) => s.setSeasonOpen)
+  const setCrewOpen = useGameStore((s) => s.setCrewOpen)
+  const toggleAchievements = useGameStore((s) => s.toggleAchievements)
   const low = oxygen < 30
 
   return (
@@ -147,6 +148,24 @@ function UnderwaterBar() {
         >
           <Leaf className="size-4" />
         </button>
+        <button
+          type="button"
+          onClick={toggleAchievements}
+          className="glass pointer-events-auto grid size-9 place-items-center rounded-full text-foam/70 transition-colors hover:border-gold/40 hover:text-gold active:translate-y-px"
+          aria-label="打开成就"
+          title="成就 (J)"
+        >
+          <Trophy className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setCrewOpen(true)}
+          className="glass pointer-events-auto grid size-9 place-items-center rounded-full text-foam/70 transition-colors hover:border-tide/40 hover:text-tide active:translate-y-px"
+          aria-label="打开船员名册"
+          title="船员 (K)"
+        >
+          <Users className="size-4" />
+        </button>
         <div className="hidden sm:block">
           <MuteButton />
         </div>
@@ -158,6 +177,7 @@ function UnderwaterBar() {
 export function Hud() {
   const money = useGameStore((s) => s.money)
   const bagCount = useGameStore((s) => s.bag.length)
+  const capacity = useGameStore((s) => bagCapacity(s))
   const zone = useGameStore((s) => s.zone)
   const phase = useGameStore((s) => s.phase)
   const underwater = useGameStore((s) => s.underwater)
@@ -170,6 +190,9 @@ export function Hud() {
   const setBaitOpen = useGameStore((s) => s.setBaitOpen)
   const setSeasonOpen = useGameStore((s) => s.setSeasonOpen)
   const setUnderwater = useGameStore((s) => s.setUnderwater)
+  const boss = useGameStore((s) => s.boss)
+  const combatCamera = useGameStore((s) => s.combatCamera)
+  const toggleCombatCamera = useGameStore((s) => s.toggleCombatCamera)
   const toast = useGameStore((s) => s.toast)
   const isTouch = useIsTouch()
 
@@ -211,6 +234,10 @@ export function Hud() {
   }
 
   const dive = () => {
+    if (boss) {
+      toggleCombatCamera()
+      return
+    }
     if (phase !== 'idle') {
       toast('先收线，再潜下水')
       return
@@ -245,13 +272,13 @@ export function Hud() {
               <span
                 className={cn(
                   'grid size-6 place-items-center rounded-full transition-colors',
-                  bagCount >= BAG_CAPACITY ? 'bg-destructive/20 text-destructive' : 'bg-tide/15 text-tide',
+                  bagCount >= capacity ? 'bg-destructive/20 text-destructive' : 'bg-tide/15 text-tide',
                 )}
               >
                 <Fish className="size-3.5" />
               </span>
               <span className="tnum text-[13px] font-semibold text-foam">{bagCount}</span>
-              <span className="tnum text-[11px] text-muted-foreground">/ {BAG_CAPACITY}</span>
+              <span className="tnum text-[11px] text-muted-foreground">/ {capacity}</span>
             </button>
           </div>
 
@@ -300,11 +327,15 @@ export function Hud() {
               type="button"
               onClick={dive}
               className="glass pointer-events-auto flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[10.5px] text-foam/75 transition-colors hover:border-tide/35 hover:text-tide active:translate-y-px"
-              aria-label="潜入水下"
-              title="潜入水下 (V)"
+              aria-label={boss ? '切换战斗视角' : '潜入水下'}
+              title={boss ? '切换战斗视角 (V)' : '潜入水下 (V)'}
             >
-              <Waves className="size-3.5 text-tide/80" />
-              潜水
+              {boss ? (
+                <Video className={cn('size-3.5', combatCamera ? 'text-gold' : 'text-tide/80')} />
+              ) : (
+                <Waves className="size-3.5 text-tide/80" />
+              )}
+              {boss ? (combatCamera ? '自由视角' : '战斗视角') : '潜水'}
               {!isTouch && <span className="text-[9px] text-foam/30">V</span>}
             </button>
           </div>

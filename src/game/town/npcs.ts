@@ -5,6 +5,7 @@ export type DialogueAction =
   | { type: 'market' }
   | { type: 'gift' }
   | { type: 'pet' }
+  | { type: 'crew' }
   | { type: 'close' }
 
 export interface DialogueCondition {
@@ -214,6 +215,47 @@ export const NPCS: NpcDef[] = [
       heat: {
         text: '“看鱼皮。刚下锅时别动，等边缘起小泡再翻。火太急，外面焦了里面还生；火太慢，肉就柴了。起锅那一下要果断，别犹豫。”他用铲子在空中虚点了一下。',
         options: [{ label: '试试看', action: { type: 'tab', tab: 'kitchen' } }],
+      },
+    },
+  },
+  {
+    id: 'bo',
+    name: '泊叔',
+    role: '船员中介',
+    color: '#5c7a80',
+    accent: '#b8e0e6',
+    tagline: '海上讨生活的人，我这儿都有名册。',
+    tab: 'shop',
+    root: 'root',
+    greetings: {
+      spring: '“春天风软，正是练手的时候。”泊叔把一本旧名册推过来，“船上多个人，多双手。”',
+      summer: '“夏天出海时间长，甲板上得有换班的人。”他扇着蒲扇，“舵手和船匠最抢手。”',
+      autumn: '“秋汛忙，雇人得趁早。”他敲敲名册，“好手不等人，价钱也一日一变。”',
+      winter: '“冷天出海，一个人顶不住。”泊叔呵了口白气，“挑个能干的，命比钱贵。”',
+    },
+    nodes: {
+      root: {
+        text: '泊叔坐在一只倒扣的旧鱼筐上，膝盖摊开一本被海风吹卷边的名册。',
+        options: [
+          { label: '看看能雇谁', action: { type: 'crew' }, note: '金币雇佣' },
+          { label: '船员能帮上什么忙？', next: 'buff' },
+          { label: '最近海上不太平？', next: 'sea' },
+          { label: '先走了', action: { type: 'close' } },
+        ],
+      },
+      buff: {
+        text: '“舵手能借风，船匠会补板，炮手出手更狠，潜水员省氧气。”泊叔用指节点了点名册，“各管一摊，工钱一次付清。人上了船，就跟你到天涯。”',
+        options: [
+          { label: '看看名册', action: { type: 'crew' } },
+          { label: '记下了', action: { type: 'close' } },
+        ],
+      },
+      sea: {
+        text: '“幽灵船、触手、装可怜的商人，还有说来就来的暴风雨。”他抬眼看了看天，“真遇上桅杆断了，别慌，靠过去按 E 一下一下修。船还在，人就还在。”',
+        options: [
+          { label: '受教了', action: { type: 'close' } },
+          { label: '带我去看看人', action: { type: 'crew' } },
+        ],
       },
     },
   },

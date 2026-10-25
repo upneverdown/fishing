@@ -4,13 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { FishArt } from '@/components/FishArt'
 import { FISH, RARITIES } from '@/game/fishing/fishTable'
-import { BAG_CAPACITY, useGameStore } from '@/store/useGameStore'
+import { bagCapacity, useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
 
 export function BagDialog() {
   const open = useGameStore((s) => s.bagOpen)
   const setBagOpen = useGameStore((s) => s.setBagOpen)
   const bag = useGameStore((s) => s.bag)
+  const capacity = useGameStore((s) => bagCapacity(s))
   const caughtLog = useGameStore((s) => s.caughtLog)
   const bestKg = useGameStore((s) => s.bestKg)
   const totalEarned = useGameStore((s) => s.totalEarned)
@@ -63,7 +64,7 @@ export function BagDialog() {
             <div className="text-[9.5px] tracking-[0.16em] text-muted-foreground">鱼篓</div>
             <div className="tnum mt-1 text-[15px] font-semibold text-foam">
               {bag.length}
-              <span className="text-[10px] text-foam/35"> / {BAG_CAPACITY}</span>
+              <span className="text-[10px] text-foam/35"> / {capacity}</span>
             </div>
           </div>
           <div className="rounded-lg border border-border/45 bg-card/40 px-2.5 py-2">

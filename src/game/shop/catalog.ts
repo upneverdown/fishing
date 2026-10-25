@@ -1,4 +1,6 @@
-export type BoatSkinId = 'rowboat' | 'speedboat' | 'patrol' | 'submarine'
+import type { WaterId } from '@/types'
+
+export type BoatSkinId = 'rowboat' | 'speedboat' | 'patrol' | 'submarine' | 'icebreaker' | 'pirate'
 export type RodSkinId = 'classic' | 'tide' | 'ember' | 'aurora'
 export type DecorationId = 'figurehead' | 'garland' | 'flag' | 'crate'
 
@@ -13,6 +15,14 @@ export interface BoatStyle {
   speed: number
   turn: number
   accent: string
+  tier: number
+  classLabel: string
+  capacity: number
+  gearCap: number
+  facilitySlots: number
+  durability: number
+  weatherproof: boolean
+  waters: WaterId[]
 }
 
 export interface RodSkin {
@@ -46,6 +56,14 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1,
     turn: 1,
     accent: '#c9945e',
+    tier: 1,
+    classLabel: '小木船',
+    capacity: 10,
+    gearCap: 2,
+    facilitySlots: 2,
+    durability: 70,
+    weatherproof: false,
+    waters: ['bay', 'creek'],
   },
   {
     id: 'speedboat',
@@ -56,6 +74,14 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1.38,
     turn: 1.18,
     accent: '#5fd8c9',
+    tier: 2,
+    classLabel: '快艇',
+    capacity: 16,
+    gearCap: 3,
+    facilitySlots: 3,
+    durability: 90,
+    weatherproof: false,
+    waters: ['bay', 'creek', 'falls', 'mirror'],
   },
   {
     id: 'patrol',
@@ -66,6 +92,14 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1.15,
     turn: 0.86,
     accent: '#8fb0bd',
+    tier: 3,
+    classLabel: '豪华游艇',
+    capacity: 26,
+    gearCap: 3,
+    facilitySlots: 4,
+    durability: 120,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
   },
   {
     id: 'submarine',
@@ -76,6 +110,50 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1.06,
     turn: 1.12,
     accent: '#d8b45a',
+    tier: 3,
+    classLabel: '潜航艇',
+    capacity: 20,
+    gearCap: 3,
+    facilitySlots: 3,
+    durability: 100,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+  },
+  {
+    id: 'icebreaker',
+    name: '白夜号',
+    title: '破冰船',
+    tagline: '厚钢板船首能把浮冰压碎，冬天去最北边的海域也稳。',
+    price: 4200,
+    speed: 1.02,
+    turn: 0.92,
+    accent: '#d7e6ee',
+    tier: 3,
+    classLabel: '破冰船',
+    capacity: 22,
+    gearCap: 3,
+    facilitySlots: 4,
+    durability: 150,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+  },
+  {
+    id: 'pirate',
+    name: '黑帆号',
+    title: '海盗船',
+    tagline: '黑色船壳、破帆与船首骷髅，船尾灯笼在夜里像一点不肯熄灭的鬼火。',
+    price: 6800,
+    speed: 1.24,
+    turn: 0.78,
+    accent: '#d6a84a',
+    tier: 4,
+    classLabel: '加勒比海盗船',
+    capacity: 30,
+    gearCap: 3,
+    facilitySlots: 4,
+    durability: 320,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
   },
 ]
 
@@ -187,6 +265,22 @@ export const DEFAULT_OWNED = ['rowboat', 'classic']
 
 export function isBoatSkin(id: string): id is BoatSkinId {
   return BOAT_STYLES.some((s) => s.id === id)
+}
+
+export function boatStyle(id: BoatSkinId): BoatStyle {
+  return BOAT_STYLES.find((s) => s.id === id) ?? BOAT_STYLES[0]
+}
+
+export function boatCapacity(id: BoatSkinId): number {
+  return boatStyle(id).capacity
+}
+
+export function boatGearCap(id: BoatSkinId): number {
+  return boatStyle(id).gearCap
+}
+
+export function boatFacilitySlots(id: BoatSkinId): number {
+  return boatStyle(id).facilitySlots
 }
 
 export function isRodSkin(id: string): id is RodSkinId {

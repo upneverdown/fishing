@@ -1,23 +1,34 @@
 import { create } from 'zustand'
 import type {
+  AchievementToast,
   BaitId,
+  BoatPose,
+  BossHud,
   CaptureTargetInfo,
   CaptureToolId,
   Catch,
   CatchMethod,
+  FacilityId,
   FishingPhase,
   FightState,
   GearId,
+  NavSnapshot,
   Quality,
+  RadarContact,
   Rarity,
+  SeaEventHud,
   SeasonId,
   ToastItem,
   TownTab,
   UnderwaterMode,
+  WeaponId,
 } from '@/types'
 import {
   DEFAULT_OWNED,
   DECORATIONS,
+  boatCapacity,
+  boatFacilitySlots,
+  boatGearCap,
   findShopEntry,
   isBoatSkin,
   isDecoration,
@@ -89,8 +100,26 @@ import {
   type PetState,
 } from '@/game/pet/pet'
 import { clamp } from '@/game/utils/math'
+import { WEAPONS, weaponById, weaponRefillCost } from '@/game/combat/weapons'
+import { FACILITIES, facilityById, isFacilityId } from '@/game/boat/facilities'
+import {
+  DEFAULT_VARIANTS,
+  TOOL_VARIANTS,
+  variantById,
+  variantsFor,
+  type ToolVariantId,
+} from '@/game/capture/variants'
+import {
+  ACHIEVEMENTS,
+  achievementById,
+  emptyAchievements,
+  type AchievementMap,
+  type AchievementProgress,
+} from '@/game/achievements/catalog'
+import { CREW, crewById } from '@/game/crew/crew'
 
 export const BAG_CAPACITY = 10
+export const MAX_HP = 100
 export const UNDERWATER_MODES: UnderwaterMode[] = ['dive', 'follow', 'orbit']
 export const UNDERWATER_MODE_LABEL: Record<UnderwaterMode, string> = {
   dive: '自由潜游',
@@ -167,6 +196,20 @@ interface PersistedProgress {
   dailySold: DailySold
   gatherCooldowns: Record<string, number>
   stats: StoreStats
+  hp: number
+  ownedWeapons: WeaponId[]
+  equippedWeapon: WeaponId
+  weaponAmmo: Record<WeaponId, number>
+  ownedFacilities: FacilityId[]
+  installedFacilities: (FacilityId | null)[]
+  facilityActive: Partial<Record<FacilityId, boolean>>
+  boatPose: BoatPose | null
+  toolVariants: Record<'harpoon' | 'net', ToolVariantId>
+  ownedVariants: ToolVariantId[]
+  variantAmmo: Record<string, number>
+  achievements: AchievementMap
+  crew: string[]
+  relics: string[]
 }
 
 interface GameStore extends PersistedProgress {
@@ -178,6 +221,7 @@ interface GameStore extends PersistedProgress {
   bite: boolean
   prompt: string | null
   nearDock: boolean
+  interactLabel: string | null
   card: Catch | null
   cardAdded: boolean
   marketOpen: boolean
@@ -188,6 +232,8 @@ interface GameStore extends PersistedProgress {
   townOpen: boolean
   townTab: TownTab
   npcId: string | null
+  cookingOpen: boolean
+  lightningAt: number
   captureResult: Catch[] | null
   captureTarget: CaptureTargetInfo | null
   rareFlash: Rarity | null
@@ -199,6 +245,19 @@ interface GameStore extends PersistedProgress {
   oxygen: number
   depth: number
   observedFish: string | null
+  dead: boolean
+  hitAt: number
+  respawnToken: number
+  boss: BossHud | null
+  radarContacts: RadarContact[]
+  inputLocked: boolean
+  combatCamera: boolean
+  nav: NavSnapshot | null
+  achievementsOpen: boolean
+  achievementToast: AchievementToast | null
+  crewOpen: boolean
+  seaEvent: SeaEventHud | null
+  chestPrompt: string | null
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -208,6 +267,7 @@ interface GameStore extends PersistedProgress {
   setBite: (bite: boolean) => void
   setPrompt: (prompt: string | null) => void
   setNearDock: (near: boolean) => void
+  setInteractLabel: (label: string | null) => void
   showCard: (c: Catch, added: boolean) => void
   closeCard: () => void
   addCatch: (c: Catch, method?: CatchMethod) => boolean
@@ -223,6 +283,8 @@ interface GameStore extends PersistedProgress {
   setTownTab: (tab: TownTab) => void
   openNpc: (id: string) => void
   closeNpc: () => void
+  setCookingOpen: (open: boolean) => void
+  flashSky: () => void
   setCaptureResult: (list: Catch[] | null) => void
   setCaptureTarget: (target: CaptureTargetInfo | null) => void
   buyItem: (id: string) => boolean
@@ -265,6 +327,40 @@ interface GameStore extends PersistedProgress {
   abandonQuest: (id: string) => void
   claimQuest: (id: string) => boolean
   refreshDailyQuests: () => void
+  damagePlayer: (amount: number, source?: string) => boolean
+  healPlayer: (amount: number) => void
+  respawn: () => void
+  buyWeapon: (id: WeaponId) => boolean
+  equipWeapon: (id: WeaponId) => void
+  consumeAmmo: (id: WeaponId) => boolean
+  refillWeapon: (id: WeaponId) => boolean
+  buyFacility: (id: FacilityId) => boolean
+  installFacility: (index: number, id: FacilityId | null) => void
+  toggleFacility: (id: FacilityId) => void
+  grillCatch: () => boolean
+  grantMoney: (amount: number, text?: string) => void
+  setBoatPose: (pose: BoatPose) => void
+  setBoss: (boss: BossHud | null) => void
+  setRadarContacts: (contacts: RadarContact[]) => void
+  setInputLocked: (locked: boolean) => void
+  setCombatCamera: (on: boolean) => void
+  toggleCombatCamera: () => void
+  setNav: (nav: NavSnapshot) => void
+  buyToolVariant: (id: ToolVariantId) => boolean
+  setToolVariant: (id: ToolVariantId) => void
+  cycleToolVariant: () => void
+  consumeVariantAmmo: (id: ToolVariantId) => boolean
+  refillVariantAmmo: (id: ToolVariantId) => boolean
+  grantVariant: (id: ToolVariantId) => boolean
+  setAchievementsOpen: (open: boolean) => void
+  toggleAchievements: () => void
+  advanceAchievement: (id: string, amount: number) => void
+  dismissAchievementToast: () => void
+  setCrewOpen: (open: boolean) => void
+  hireCrew: (id: string) => boolean
+  addRelic: (name: string) => void
+  setSeaEvent: (event: SeaEventHud | null) => void
+  setChestPrompt: (text: string | null) => void
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
   resetProgress: () => void
@@ -274,8 +370,64 @@ function isObj(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v)
 }
 
+function isWeaponId(value: unknown): value is WeaponId {
+  return typeof value === 'string' && WEAPONS.some((w) => w.id === value)
+}
+
+function isVariantId(value: unknown): value is ToolVariantId {
+  return typeof value === 'string' && TOOL_VARIANTS.some((v) => v.id === value)
+}
+
+function sanitizeInstalled(raw: unknown, boat: BoatSkinId): (FacilityId | null)[] {
+  const slots = boatFacilitySlots(boat)
+  const base = Array.from({ length: slots }, () => null) as (FacilityId | null)[]
+  if (!Array.isArray(raw)) return base
+  for (let i = 0; i < slots; i++) {
+    const id = raw[i]
+    if (typeof id === 'string' && isFacilityId(id)) base[i] = id
+  }
+  return base
+}
+
+function resizeInstalled(list: (FacilityId | null)[], boat: BoatSkinId): (FacilityId | null)[] {
+  const slots = boatFacilitySlots(boat)
+  const out = list.slice(0, slots)
+  while (out.length < slots) out.push(null)
+  return out
+}
+
+function defaultVariantAmmo(): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const variant of TOOL_VARIANTS) out[variant.id] = variant.ammoMax
+  return out
+}
+
 function num(v: unknown, fallback: number) {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+}
+
+function sanitizeAchievements(raw: unknown): AchievementMap {
+  const map = emptyAchievements()
+  if (!isObj(raw)) return map
+  for (const def of ACHIEVEMENTS) {
+    const entry = raw[def.id]
+    if (!isObj(entry)) continue
+    const progress: AchievementProgress = {
+      progress: clamp(num(entry.progress, 0), 0, def.target),
+      unlockedAt: Math.max(0, num(entry.unlockedAt, 0)),
+    }
+    map[def.id] = progress
+  }
+  return map
+}
+
+function sanitizeCrew(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const id of raw) {
+    if (typeof id === 'string' && crewById(id) && !out.includes(id)) out.push(id)
+  }
+  return out.slice(0, CREW.length)
 }
 
 function readSave(): Partial<PersistedProgress> {
@@ -341,6 +493,65 @@ function readSave(): Partial<PersistedProgress> {
       out.gatherCooldowns = map
     }
     if (isObj(p.stats)) out.stats = p.stats as unknown as StoreStats
+    if (typeof p.hp === 'number') out.hp = p.hp
+    if (Array.isArray(p.ownedWeapons)) {
+      out.ownedWeapons = p.ownedWeapons.filter(isWeaponId)
+    }
+    if (isWeaponId(p.equippedWeapon)) out.equippedWeapon = p.equippedWeapon
+    if (isObj(p.weaponAmmo)) {
+      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6 }
+      for (const weapon of WEAPONS) {
+        ammo[weapon.id] = Math.max(0, Math.round(num(p.weaponAmmo[weapon.id], weapon.ammoMax)))
+      }
+      out.weaponAmmo = ammo
+    }
+    if (Array.isArray(p.ownedFacilities)) {
+      out.ownedFacilities = p.ownedFacilities.filter(
+        (id): id is FacilityId => typeof id === 'string' && isFacilityId(id),
+      )
+    }
+    if (Array.isArray(p.installedFacilities)) {
+      out.installedFacilities = p.installedFacilities as (FacilityId | null)[]
+    }
+    if (isObj(p.facilityActive)) {
+      const active: Partial<Record<FacilityId, boolean>> = {}
+      for (const facility of FACILITIES) {
+        if (typeof p.facilityActive[facility.id] === 'boolean') {
+          active[facility.id] = Boolean(p.facilityActive[facility.id])
+        }
+      }
+      out.facilityActive = active
+    }
+    if (isObj(p.boatPose) && typeof p.boatPose.x === 'number' && typeof p.boatPose.z === 'number') {
+      out.boatPose = {
+        x: p.boatPose.x,
+        z: p.boatPose.z,
+        heading: num(p.boatPose.heading, 0),
+      }
+    }
+    if (isObj(p.toolVariants)) {
+      const variants = { ...DEFAULT_VARIANTS }
+      for (const key of ['harpoon', 'net'] as const) {
+        const value = p.toolVariants[key]
+        if (isVariantId(value) && variantById(value)?.tool === key) variants[key] = value
+      }
+      out.toolVariants = variants
+    }
+    if (Array.isArray(p.ownedVariants)) {
+      out.ownedVariants = p.ownedVariants.filter(isVariantId)
+    }
+    if (isObj(p.variantAmmo)) {
+      const ammo: Record<string, number> = {}
+      for (const variant of TOOL_VARIANTS) {
+        ammo[variant.id] = Math.max(0, Math.round(num(p.variantAmmo[variant.id], variant.ammoMax)))
+      }
+      out.variantAmmo = ammo
+    }
+    out.achievements = sanitizeAchievements(p.achievements)
+    out.crew = sanitizeCrew(p.crew)
+    if (Array.isArray(p.relics)) {
+      out.relics = p.relics.filter((v): v is string => typeof v === 'string').slice(0, 40)
+    }
     return out
   } catch {
     return {}
@@ -463,6 +674,8 @@ function sanitizeStats(raw: StoreStats | undefined): StoreStats {
 }
 
 let toastSeq = 0
+let achievementSeq = 0
+let achievementPersistAt = 0
 
 export const useGameStore = create<GameStore>()((set, get) => {
   const saved = readSave()
@@ -510,6 +723,26 @@ export const useGameStore = create<GameStore>()((set, get) => {
   const codexClaims = (saved.codexClaims ?? []).filter((n) =>
     (CODEX_MILESTONES as readonly number[]).includes(n),
   )
+  const initialHp = Math.round(clamp(num(saved.hp, MAX_HP), 1, MAX_HP))
+  const ownedWeapons = Array.from(
+    new Set<WeaponId>(['knife', ...(saved.ownedWeapons ?? [])]),
+  )
+  const equippedWeapon =
+    saved.equippedWeapon && ownedWeapons.includes(saved.equippedWeapon)
+      ? saved.equippedWeapon
+      : 'knife'
+  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6 }
+  const ownedFacilities = saved.ownedFacilities ?? []
+  const installedFacilities = sanitizeInstalled(saved.installedFacilities, initialBoat)
+  const facilityActive = saved.facilityActive ?? {}
+  const toolVariants = saved.toolVariants ?? { ...DEFAULT_VARIANTS }
+  const ownedVariants = Array.from(
+    new Set<ToolVariantId>(['harpoon', 'net', ...(saved.ownedVariants ?? [])]),
+  )
+  const variantAmmo = { ...defaultVariantAmmo(), ...(saved.variantAmmo ?? {}) }
+  const achievements = sanitizeAchievements(saved.achievements)
+  const crew = sanitizeCrew(saved.crew)
+  const relics = saved.relics ?? []
 
   const persist = () => {
     const {
@@ -542,6 +775,20 @@ export const useGameStore = create<GameStore>()((set, get) => {
       dailySold,
       gatherCooldowns,
       stats,
+      hp,
+      ownedWeapons,
+      equippedWeapon,
+      weaponAmmo,
+      ownedFacilities,
+      installedFacilities,
+      facilityActive,
+      boatPose,
+      toolVariants,
+      ownedVariants,
+      variantAmmo,
+      achievements,
+      crew,
+      relics,
     } = get()
     try {
       localStorage.setItem(
@@ -576,6 +823,20 @@ export const useGameStore = create<GameStore>()((set, get) => {
           dailySold,
           gatherCooldowns,
           stats,
+          hp,
+          ownedWeapons,
+          equippedWeapon,
+          weaponAmmo,
+          ownedFacilities,
+          installedFacilities,
+          facilityActive,
+          boatPose,
+          toolVariants,
+          ownedVariants,
+          variantAmmo,
+          achievements,
+          crew,
+          relics,
         }),
       )
     } catch {
@@ -640,6 +901,20 @@ export const useGameStore = create<GameStore>()((set, get) => {
     dailySold,
     gatherCooldowns,
     stats,
+    hp: initialHp,
+    ownedWeapons,
+    equippedWeapon,
+    weaponAmmo,
+    ownedFacilities,
+    installedFacilities,
+    facilityActive,
+    boatPose: saved.boatPose ?? null,
+    toolVariants,
+    ownedVariants,
+    variantAmmo,
+    achievements,
+    crew,
+    relics,
 
     started: false,
     phase: 'idle',
@@ -649,6 +924,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     bite: false,
     prompt: null,
     nearDock: false,
+    interactLabel: null,
     card: null,
     cardAdded: false,
     marketOpen: false,
@@ -659,6 +935,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     townOpen: false,
     townTab: 'quests',
     npcId: null,
+    cookingOpen: false,
+    lightningAt: 0,
     captureResult: null,
     captureTarget: null,
     rareFlash: null,
@@ -670,6 +948,19 @@ export const useGameStore = create<GameStore>()((set, get) => {
     oxygen: 100,
     depth: 0,
     observedFish: null,
+    dead: false,
+    hitAt: 0,
+    respawnToken: 0,
+    boss: null,
+    radarContacts: [],
+    inputLocked: false,
+    combatCamera: false,
+    nav: null,
+    achievementsOpen: false,
+    achievementToast: null,
+    crewOpen: false,
+    seaEvent: null,
+    chestPrompt: null,
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -679,14 +970,22 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setBite: (bite) => set({ bite }),
     setPrompt: (prompt) => set({ prompt }),
     setNearDock: (near) => set({ nearDock: near }),
+    setInteractLabel: (label) => set({ interactLabel: label }),
 
     showCard: (c, added) => set({ card: c, cardAdded: added }),
     closeCard: () => set({ card: null }),
 
     addCatch: (c, method = c.method ?? 'rod') => {
       const state = get()
-      const added = state.bag.length < BAG_CAPACITY
+      const added = state.bag.length < bagCapacity(state)
       const bag = added ? [...state.bag, { ...c, method }] : state.bag
+      if (c.junk) {
+        set({ bag })
+        if (!added) get().toast('鱼篓满了，这团垃圾又滑回海里', 'danger')
+        else get().toast(`捞上来一${c.name}…`, 'info')
+        persist()
+        return added
+      }
       const caughtLog = { ...state.caughtLog, [c.defId]: (state.caughtLog[c.defId] ?? 0) + 1 }
       const key = `fish:${c.defId}`
       const codex = {
@@ -729,7 +1028,13 @@ export const useGameStore = create<GameStore>()((set, get) => {
       const state = get()
       const target = state.bag.find((c) => c.id === id)
       if (!target) return
-      const quote = marketQuote(target, state.season, state.cabinLevel, state.dailySold)
+      const quote = marketQuote(
+        target,
+        state.season,
+        state.cabinLevel,
+        state.dailySold,
+        state.installedFacilities.includes('livewell'),
+      )
       const dailySold = addDailySold(state.dailySold, quote.price)
       const quests = bumpQuests(state, { kind: 'sell', amount: quote.price })
       set({
@@ -748,7 +1053,13 @@ export const useGameStore = create<GameStore>()((set, get) => {
       const state = get()
       if (!state.bag.length) return
       const quotes = state.bag.map((c) =>
-        marketQuote(c, state.season, state.cabinLevel, state.dailySold),
+        marketQuote(
+          c,
+          state.season,
+          state.cabinLevel,
+          state.dailySold,
+          state.installedFacilities.includes('livewell'),
+        ),
       )
       const total = quotes.reduce((s, q) => s + q.price, 0)
       const dailySold = addDailySold(state.dailySold, total)
@@ -770,6 +1081,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         marketOpen: true,
         townOpen: false,
         npcId: null,
+        cookingOpen: false,
         bagOpen: false,
         shopOpen: false,
         baitOpen: false,
@@ -796,6 +1108,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         set({
           townOpen: true,
           npcId: null,
+          cookingOpen: false,
           marketOpen: false,
           bagOpen: false,
           shopOpen: false,
@@ -811,9 +1124,32 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setTownTab: (tab) => set({ townTab: tab }),
     openNpc: (id) => {
       if (!npcById(id)) return
-      set({ npcId: id, townOpen: true })
+      set({ npcId: id, cookingOpen: false })
     },
     closeNpc: () => set({ npcId: null }),
+    setCookingOpen: (open) => {
+      const state = get()
+      if (open && state.underwater) {
+        state.toast('先浮回水面再开锅', 'info')
+        return
+      }
+      if (open) {
+        set({
+          cookingOpen: true,
+          townOpen: false,
+          npcId: null,
+          marketOpen: false,
+          bagOpen: false,
+          shopOpen: false,
+          baitOpen: false,
+          seasonOpen: false,
+          card: null,
+        })
+      } else {
+        set({ cookingOpen: false })
+      }
+    },
+    flashSky: () => set({ lightningAt: Date.now() }),
 
     setCaptureResult: (list) => set({ captureResult: list }),
     setCaptureTarget: (target) => set({ captureTarget: target }),
@@ -862,6 +1198,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
         captureTarget: null,
         townOpen: false,
         npcId: null,
+        cookingOpen: false,
+        combatCamera: false,
+        inputLocked: underwater ? false : get().inputLocked,
       })
       if (underwater) {
         state.toast('已潜入水下 · 左键使用工具 / V 上浮', 'info')
@@ -900,7 +1239,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
         money: state.money - entry.price,
         ownedItems,
       }
-      if (entry.kind === 'boat' && isBoatSkin(id)) patch.boatSkin = id
+      if (entry.kind === 'boat' && isBoatSkin(id)) {
+        patch.boatSkin = id
+        patch.installedFacilities = resizeInstalled(state.installedFacilities, id)
+      }
       if (entry.kind === 'rod' && isRodSkin(id)) patch.rodSkin = id
       if (entry.kind === 'decoration' && isDecoration(id) && !state.decorations.includes(id)) {
         patch.decorations = [...state.decorations, id]
@@ -915,7 +1257,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
     equipBoat: (id) => {
       const state = get()
       if (!state.ownedItems.includes(id)) return
-      set({ boatSkin: id })
+      set({
+        boatSkin: id,
+        installedFacilities: resizeInstalled(state.installedFacilities, id),
+      })
       const style = findShopEntry(id)
       get().toast(`已换乘 ${style?.name ?? '新船'}`, 'gold')
       persist()
@@ -1056,7 +1401,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         state.toast(`鱼笼还要 ${Math.ceil((trap.readyAt - now) / 1000)} 秒`, 'info')
         return false
       }
-      if (state.bag.length >= BAG_CAPACITY) {
+      if (state.bag.length >= bagCapacity(state)) {
         state.toast('鱼篓满了，先腾出位置再收笼', 'danger')
         return false
       }
@@ -1577,6 +1922,457 @@ export const useGameStore = create<GameStore>()((set, get) => {
       persist()
     },
 
+    damagePlayer: (amount, source = '海怪') => {
+      const state = get()
+      if (state.dead) return false
+      const armor = !state.underwater && state.boatSkin === 'pirate' ? 0.62 : 1
+      const dmg = Math.max(1, Math.round(amount * armor))
+      const hp = Math.max(0, state.hp - dmg)
+      if (hp <= 0) {
+        const lost = Math.floor(state.bag.length / 2)
+        set({
+          hp: 0,
+          hitAt: Date.now(),
+          dead: true,
+          underwater: false,
+          oxygen: 100,
+          depth: 0,
+          bag: state.bag.slice(lost),
+          captureTarget: null,
+          fight: null,
+          phase: 'idle',
+          boss: null,
+          combatCamera: false,
+          inputLocked: false,
+        })
+        state.toast(
+          `${source}把你打翻在海里 · 丢失 ${lost} 条渔获，被拖回了岸边`,
+          'danger',
+        )
+        persist()
+        return true
+      }
+      set({ hp, hitAt: Date.now() })
+      state.toast(`${source}造成 ${dmg} 点伤害 · 生命 ${hp}/${MAX_HP}`, 'danger')
+      persist()
+      return true
+    },
+
+    healPlayer: (amount) => {
+      const state = get()
+      if (state.dead) return
+      const hp = clamp(state.hp + Math.max(0, Math.round(amount)), 0, MAX_HP)
+      if (hp === state.hp) return
+      set({ hp })
+      persist()
+    },
+
+    respawn: () => {
+      const state = get()
+      if (!state.dead) return
+      set({
+        dead: false,
+        hp: MAX_HP,
+        underwater: false,
+        oxygen: 100,
+        depth: 0,
+        respawnToken: state.respawnToken + 1,
+        inputLocked: false,
+        combatCamera: false,
+      })
+      state.toast('你被拖回了老码头 · 生命已经恢复', 'gold')
+      persist()
+    },
+
+    buyWeapon: (id) => {
+      const def = weaponById(id)
+      const state = get()
+      if (!def) return false
+      if (state.ownedWeapons.includes(id)) {
+        state.toast('这件武器已经在你的装备里了')
+        return false
+      }
+      if (state.money < def.price) {
+        state.toast(`购买 ${def.name} 需要 ¥${def.price}`, 'danger')
+        return false
+      }
+      const ammo = { ...state.weaponAmmo, [id]: def.ammoMax }
+      set({
+        money: state.money - def.price,
+        ownedWeapons: [...state.ownedWeapons, id],
+        equippedWeapon: id,
+        weaponAmmo: ammo,
+      })
+      state.toast(`购入 ${def.name} · 已装备`, 'gold')
+      persist()
+      return true
+    },
+
+    equipWeapon: (id) => {
+      const state = get()
+      if (!state.ownedWeapons.includes(id)) return
+      if (state.equippedWeapon === id) return
+      set({ equippedWeapon: id })
+      state.toast(`换用 ${weaponById(id)?.name ?? '武器'}`, 'info')
+      persist()
+    },
+
+    consumeAmmo: (id) => {
+      const def = weaponById(id)
+      const state = get()
+      if (!def) return false
+      if (def.ammoMax === 0) return true
+      const ammo = state.weaponAmmo[id] ?? 0
+      if (ammo <= 0) {
+        state.toast(`${def.name}没弹药了，回渔具铺补给`, 'danger')
+        return false
+      }
+      set({ weaponAmmo: { ...state.weaponAmmo, [id]: ammo - 1 } })
+      persist()
+      return true
+    },
+
+    refillWeapon: (id) => {
+      const def = weaponById(id)
+      const state = get()
+      if (!def || def.ammoMax === 0) return false
+      const ammo = state.weaponAmmo[id] ?? 0
+      if (ammo >= def.ammoMax) {
+        state.toast('弹药已经是满的')
+        return false
+      }
+      const cost = weaponRefillCost(id, ammo)
+      if (state.money < cost) {
+        state.toast(`补给需要 ¥${cost}`, 'danger')
+        return false
+      }
+      set({
+        money: state.money - cost,
+        weaponAmmo: { ...state.weaponAmmo, [id]: def.ammoMax },
+      })
+      state.toast(`补给 ${def.name} 弹药 · -¥${cost}`, 'gold')
+      persist()
+      return true
+    },
+
+    buyFacility: (id) => {
+      const def = facilityById(id)
+      const state = get()
+      if (!def) return false
+      if (state.ownedFacilities.includes(id)) {
+        state.toast('这件设施已经买过了，去船坞装上就行')
+        return false
+      }
+      if (state.money < def.price) {
+        state.toast(`购买 ${def.name} 需要 ¥${def.price}`, 'danger')
+        return false
+      }
+      const slots = boatFacilitySlots(state.boatSkin)
+      let installed = [...state.installedFacilities]
+      while (installed.length < slots) installed.push(null)
+      const empty = installed.findIndex((slot) => slot === null)
+      if (empty >= 0 && empty < slots) installed[empty] = id
+      set({
+        money: state.money - def.price,
+        ownedFacilities: [...state.ownedFacilities, id],
+        installedFacilities: installed,
+        facilityActive: { ...state.facilityActive, [id]: def.toggle ? true : state.facilityActive[id] },
+      })
+      state.toast(
+        empty >= 0 ? `${def.name} 已安装到 ${empty + 1} 号槽` : `购入 ${def.name} · 船坞槽位已满`,
+        'gold',
+      )
+      persist()
+      return true
+    },
+
+    installFacility: (index, id) => {
+      const state = get()
+      const slots = boatFacilitySlots(state.boatSkin)
+      if (index < 0 || index >= slots) return
+      if (id && !state.ownedFacilities.includes(id)) return
+      const installed = [...state.installedFacilities]
+      while (installed.length < slots) installed.push(null)
+      if (id) {
+        const previous = installed.findIndex((slot) => slot === id)
+        if (previous >= 0 && previous !== index) installed[previous] = null
+      }
+      installed[index] = id
+      set({ installedFacilities: installed })
+      state.toast(
+        id ? `${facilityById(id)?.name ?? '设施'} 装到 ${index + 1} 号槽` : `${index + 1} 号槽已清空`,
+        id ? 'gold' : 'info',
+      )
+      persist()
+    },
+
+    toggleFacility: (id) => {
+      const state = get()
+      const def = facilityById(id)
+      if (!def) return
+      if (!state.installedFacilities.includes(id)) {
+        state.toast(`${def.name}还没装上`, 'info')
+        return
+      }
+      if (!def.toggle) {
+        state.toast(`${def.name}会一直工作`)
+        return
+      }
+      const next = !state.facilityActive[id]
+      set({ facilityActive: { ...state.facilityActive, [id]: next } })
+      state.toast(`${def.name}${next ? '已开启' : '已关闭'}`, next ? 'gold' : 'info')
+      persist()
+    },
+
+    grillCatch: () => {
+      const state = get()
+      const installed = state.installedFacilities.includes('grill')
+      if (!installed) {
+        state.toast('船上还没有烤架', 'info')
+        return false
+      }
+      if (state.hp >= MAX_HP) {
+        state.toast('状态很好，不用急着吃')
+        return false
+      }
+      const fish = [...state.bag].sort((a, b) => a.value - b.value)[0]
+      if (!fish) {
+        state.toast('鱼篓里没有鱼可以烤', 'info')
+        return false
+      }
+      set({
+        bag: state.bag.filter((c) => c.id !== fish.id),
+        hp: clamp(state.hp + 22, 0, MAX_HP),
+        stats: { ...state.stats, cooked: state.stats.cooked + 1 },
+      })
+      state.toast(`烤掉了 ${fish.name} · 生命 +22`, 'gold')
+      persist()
+      return true
+    },
+
+    grantMoney: (amount, text) => {
+      const state = get()
+      const value = Math.max(0, Math.round(amount))
+      if (!value) return
+      set({
+        money: state.money + value,
+        totalEarned: state.totalEarned + value,
+        stats: { ...state.stats, soldValue: state.stats.soldValue + value },
+      })
+      if (text) state.toast(`${text} · +¥${value}`, 'gold')
+      persist()
+    },
+
+    setBoatPose: (pose) => {
+      set({ boatPose: pose })
+      persist()
+    },
+
+    setBoss: (boss) => set({ boss }),
+    setRadarContacts: (contacts) => set({ radarContacts: contacts }),
+    setInputLocked: (inputLocked) => set({ inputLocked }),
+    setCombatCamera: (combatCamera) => set({ combatCamera }),
+    toggleCombatCamera: () => {
+      const state = get()
+      if (!state.boss) {
+        state.toast('附近没有首领，战斗视角无法锁定', 'info')
+        return
+      }
+      const next = !state.combatCamera
+      set({ combatCamera: next })
+      state.toast(next ? '镜头锁定首领 · 战斗视角' : '镜头解除锁定 · 自由视角', 'info')
+    },
+    setNav: (nav) => set({ nav }),
+
+    buyToolVariant: (id) => {
+      const def = variantById(id)
+      const state = get()
+      if (!def) return false
+      if (state.ownedVariants.includes(id)) {
+        state.toast('这件工具已经在库里了')
+        return false
+      }
+      if (state.money < def.price) {
+        state.toast(`购买 ${def.name} 需要 ¥${def.price}`, 'danger')
+        return false
+      }
+      set({
+        money: state.money - def.price,
+        ownedVariants: [...state.ownedVariants, id],
+        toolVariants: { ...state.toolVariants, [def.tool]: id },
+        variantAmmo: { ...state.variantAmmo, [id]: def.ammoMax },
+        activeTool: def.tool,
+        captureTarget: null,
+      })
+      state.toast(`购入 ${def.name} · 已换上`, 'gold')
+      persist()
+      return true
+    },
+
+    setToolVariant: (id) => {
+      const def = variantById(id)
+      const state = get()
+      if (!def) return
+      if (!state.ownedVariants.includes(id)) return
+      set({
+        toolVariants: { ...state.toolVariants, [def.tool]: id },
+        activeTool: def.tool,
+        captureTarget: null,
+      })
+      state.toast(`换上 ${def.name}`, 'info')
+      persist()
+    },
+
+    cycleToolVariant: () => {
+      const state = get()
+      const category =
+        state.activeTool === 'harpoon' ? 'harpoon' : state.activeTool === 'net' ? 'net' : null
+      if (!category) {
+        state.toast('鱼笼没有其他型号', 'info')
+        return
+      }
+      const owned = variantsFor(category).filter((v) => state.ownedVariants.includes(v.id))
+      if (owned.length < 2) {
+        state.toast('还没有可切换的进阶工具，去渔具铺看看', 'info')
+        return
+      }
+      const current = state.toolVariants[category]
+      const index = owned.findIndex((v) => v.id === current)
+      const next = owned[(index + 1) % owned.length]
+      set({
+        toolVariants: { ...state.toolVariants, [category]: next.id },
+        captureTarget: null,
+      })
+      state.toast(`换上 ${next.name}`, 'info')
+      persist()
+    },
+
+    consumeVariantAmmo: (id) => {
+      const def = variantById(id)
+      const state = get()
+      if (!def) return false
+      if (def.ammoMax === 0) return true
+      const ammo = state.variantAmmo[id] ?? 0
+      if (ammo <= 0) {
+        state.toast(`${def.name}弹药耗尽，回渔具铺补给`, 'danger')
+        return false
+      }
+      set({ variantAmmo: { ...state.variantAmmo, [id]: ammo - 1 } })
+      persist()
+      return true
+    },
+
+    refillVariantAmmo: (id) => {
+      const def = variantById(id)
+      const state = get()
+      if (!def || def.ammoMax === 0) return false
+      const ammo = state.variantAmmo[id] ?? 0
+      if (ammo >= def.ammoMax) {
+        state.toast('这件工具弹药是满的')
+        return false
+      }
+      const cost = Math.ceil((def.ammoMax - ammo) * def.ammoPrice)
+      if (state.money < cost) {
+        state.toast(`补给需要 ¥${cost}`, 'danger')
+        return false
+      }
+      set({
+        money: state.money - cost,
+        variantAmmo: { ...state.variantAmmo, [id]: def.ammoMax },
+      })
+      state.toast(`补给 ${def.name} · -¥${cost}`, 'gold')
+      persist()
+      return true
+    },
+
+    grantVariant: (id) => {
+      const def = variantById(id)
+      if (!def) return false
+      const state = get()
+      const owned = state.ownedVariants.includes(id)
+      set({
+        ownedVariants: owned ? state.ownedVariants : [...state.ownedVariants, id],
+        variantAmmo: { ...state.variantAmmo, [id]: def.ammoMax },
+      })
+      state.toast(owned ? `${def.name} 弹药已补满` : `发现稀有装备 · ${def.name}`, 'gold')
+      persist()
+      return true
+    },
+
+    setAchievementsOpen: (open) => set({ achievementsOpen: open }),
+    toggleAchievements: () => set((s) => ({ achievementsOpen: !s.achievementsOpen })),
+    dismissAchievementToast: () => set({ achievementToast: null }),
+
+    advanceAchievement: (id, amount) => {
+      const def = achievementById(id)
+      if (!def || amount <= 0) return
+      const state = get()
+      const current = state.achievements[id] ?? { progress: 0, unlockedAt: 0 }
+      if (current.unlockedAt > 0) return
+      const next = Math.min(def.target, current.progress + amount)
+      if (next >= def.target) {
+        achievementSeq += 1
+        const toast: AchievementToast = {
+          id: achievementSeq,
+          name: def.name,
+          desc: def.desc,
+          reward: def.reward,
+          icon: def.icon,
+        }
+        set({
+          achievements: {
+            ...state.achievements,
+            [id]: { progress: def.target, unlockedAt: Date.now() },
+          },
+          money: state.money + def.reward,
+          totalEarned: state.totalEarned + def.reward,
+          achievementToast: toast,
+        })
+        window.setTimeout(() => {
+          if (get().achievementToast?.id === toast.id) set({ achievementToast: null })
+        }, 4800)
+        persist()
+        return
+      }
+      set({
+        achievements: { ...state.achievements, [id]: { progress: next, unlockedAt: 0 } },
+      })
+      const now = Date.now()
+      if (now - achievementPersistAt >= 4000) {
+        achievementPersistAt = now
+        persist()
+      }
+    },
+
+    setCrewOpen: (open) => set({ crewOpen: open }),
+
+    hireCrew: (id) => {
+      const def = crewById(id)
+      const state = get()
+      if (!def) return false
+      if (state.crew.includes(id)) {
+        state.toast(`${def.name} 已经在船上了`)
+        return false
+      }
+      if (state.money < def.cost) {
+        state.toast(`雇佣 ${def.name} 需要 ¥${def.cost}`, 'danger')
+        return false
+      }
+      set({ crew: [...state.crew, id], money: state.money - def.cost })
+      state.toast(`${def.name} 上了船 · ${def.effect}`, 'gold')
+      persist()
+      return true
+    },
+
+    addRelic: (name) => {
+      const state = get()
+      set({ relics: [...state.relics, name].slice(-40) })
+      persist()
+    },
+
+    setSeaEvent: (seaEvent) => set({ seaEvent }),
+    setChestPrompt: (chestPrompt) => set({ chestPrompt }),
+
     toast: (text, tone = 'info') => {
       toastSeq += 1
       const id = toastSeq
@@ -1626,6 +2422,27 @@ export const useGameStore = create<GameStore>()((set, get) => {
         dailySold: { day: todayKey, value: 0 },
         gatherCooldowns: {},
         stats: { cooked: 0, harvested: 0, gathered: 0, soldValue: 0 },
+        hp: MAX_HP,
+        ownedWeapons: ['knife'],
+        equippedWeapon: 'knife',
+        weaponAmmo: { knife: 0, speargun: 6 },
+        ownedFacilities: [],
+        installedFacilities: sanitizeInstalled(undefined, 'rowboat'),
+        facilityActive: {},
+        boatPose: null,
+        toolVariants: { ...DEFAULT_VARIANTS },
+        ownedVariants: ['harpoon', 'net'],
+        variantAmmo: defaultVariantAmmo(),
+        dead: false,
+        hitAt: 0,
+        respawnToken: 0,
+        boss: null,
+        radarContacts: [],
+        inputLocked: false,
+        combatCamera: false,
+        nav: null,
+        interactLabel: null,
+        nearDock: false,
         baitWear: 100,
         card: null,
         fight: null,
@@ -1635,17 +2452,32 @@ export const useGameStore = create<GameStore>()((set, get) => {
         townOpen: false,
         townTab: 'quests',
         npcId: null,
+        cookingOpen: false,
+        lightningAt: 0,
         captureResult: null,
         captureTarget: null,
         rareFlash: null,
         lastCook: null,
+        achievements: emptyAchievements(),
+        crew: [],
+        relics: [],
+        achievementsOpen: false,
+        achievementToast: null,
+        crewOpen: false,
+        seaEvent: null,
+        chestPrompt: null,
       })
       persist()
     },
   }
 })
 
-export function isModalOpen(state = useGameStore.getState()) {
+export function bagCapacity(state: GameStore = useGameStore.getState()) {
+  const livewell = state.installedFacilities.includes('livewell') ? 6 : 0
+  return boatCapacity(state.boatSkin) + livewell
+}
+
+export function isModalOpen(state: GameStore = useGameStore.getState()) {
   return Boolean(
     state.card ||
       state.marketOpen ||
@@ -1655,19 +2487,23 @@ export function isModalOpen(state = useGameStore.getState()) {
       state.seasonOpen ||
       state.townOpen ||
       state.npcId ||
-      state.captureResult,
+      state.cookingOpen ||
+      state.captureResult ||
+      state.achievementsOpen ||
+      state.crewOpen ||
+      state.dead,
   )
 }
 
-export function dailyQuestsForState(state = useGameStore.getState()) {
+export function dailyQuestsForState(state: GameStore = useGameStore.getState()) {
   return dailyQuestList(state.questDay, state.questSeason)
 }
 
-export function questDefsMapForState(state = useGameStore.getState()) {
+export function questDefsMapForState(state: GameStore = useGameStore.getState()) {
   return questDefsById(state.questDay, state.questSeason)
 }
 
-export function codexProgress(state = useGameStore.getState()) {
+export function codexProgress(state: GameStore = useGameStore.getState()) {
   const total = FISH.length + CROPS.length + RECIPES.length + FORAGE.length
   const collected =
     FISH.filter((f) => (state.codex[`fish:${f.id}`]?.count ?? 0) > 0).length +
@@ -1677,11 +2513,11 @@ export function codexProgress(state = useGameStore.getState()) {
   return { collected, total, pct: total ? (collected / total) * 100 : 0 }
 }
 
-export function currentToolStats(state = useGameStore.getState()) {
+export function currentToolStats(state: GameStore = useGameStore.getState()) {
   return toolStats(state.activeTool, state.tools[state.activeTool].level)
 }
 
-export function currentDailyFactor(state = useGameStore.getState()) {
+export function currentDailyFactor(state: GameStore = useGameStore.getState()) {
   return dailySellFactor(state.dailySold)
 }
 

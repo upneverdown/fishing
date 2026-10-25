@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Button } from '@/components/ui/button'
 import { FishArt } from '@/components/FishArt'
 import { RarityDot } from '@/components/RarityBadge'
-import { BAG_CAPACITY, currentDailyFactor, useGameStore } from '@/store/useGameStore'
+import { bagCapacity, currentDailyFactor, useGameStore } from '@/store/useGameStore'
 import { freshnessOf, marketQuote } from '@/game/economy/market'
 import { SEASONS } from '@/game/world/seasons'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -121,6 +121,8 @@ export function MarketDialog() {
   const open = useGameStore((s) => s.marketOpen)
   const close = useGameStore((s) => s.closeMarket)
   const bag = useGameStore((s) => s.bag)
+  const capacity = useGameStore((s) => bagCapacity(s))
+  const livewell = useGameStore((s) => s.installedFacilities.includes('livewell'))
   const money = useGameStore((s) => s.money)
   const sellOne = useGameStore((s) => s.sellOne)
   const sellAll = useGameStore((s) => s.sellAll)
@@ -142,10 +144,10 @@ export function MarketDialog() {
     setSessionEarned(0)
   }, [open])
 
-  const quoteOf = (c: Catch) => marketQuote(c, season, cabinLevel, dailySold).price
+  const quoteOf = (c: Catch) => marketQuote(c, season, cabinLevel, dailySold, livewell).price
   const total = useMemo(
     () => bag.reduce((sum, c) => sum + quoteOf(c), 0),
-    [bag, season, cabinLevel, dailySold],
+    [bag, season, cabinLevel, dailySold, livewell],
   )
   const dailyFactor = currentDailyFactor()
 
@@ -251,7 +253,7 @@ export function MarketDialog() {
                     <div className="flex items-center gap-1.5 text-[10.5px] font-medium tracking-[0.16em] text-foam/50">
                       待售渔获
                       <span className="tnum rounded-full bg-foam/8 px-1.5 py-0.5 text-[9.5px] text-foam/55">
-                        {bag.length}/{BAG_CAPACITY}
+                        {bag.length}/{capacity}
                       </span>
                     </div>
                     <span className="tnum text-[10.5px] text-muted-foreground">估值 ¥{total}</span>

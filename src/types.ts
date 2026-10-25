@@ -14,6 +14,12 @@ export type CatchMethod = 'rod' | 'harpoon' | 'net' | 'trap'
 
 export type CaptureToolId = 'harpoon' | 'net' | 'trap'
 
+export type WaterId = 'bay' | 'creek' | 'falls' | 'mirror' | 'farsea' | 'trench'
+
+export type WeaponId = 'knife' | 'speargun'
+
+export type FacilityId = 'fishfinder' | 'livewell' | 'searchlight' | 'grill' | 'anchor'
+
 export type Quality = 'raw' | 'good' | 'perfect' | 'burnt'
 
 export type TownTab = 'quests' | 'farm' | 'kitchen' | 'codex' | 'cabin' | 'shop'
@@ -48,6 +54,7 @@ export interface Catch {
   desc: string
   caughtAt: number
   method?: CatchMethod
+  junk?: boolean
 }
 
 export interface FightState {
@@ -65,4 +72,79 @@ export interface ToastItem {
 export interface Vec2 {
   x: number
   z: number
+}
+
+export interface BoatPose {
+  x: number
+  z: number
+  heading: number
+}
+
+export interface BossHud {
+  id: string
+  name: string
+  hp: number
+  maxHp: number
+  phase: number
+  skill: string
+  ultimate?: boolean
+}
+
+export interface RadarContact {
+  id: string
+  x: number
+  z: number
+  depth: number
+  kind: 'fish' | 'shark' | 'whale' | 'boss'
+  label: string
+  distance: number
+  bearing: number
+}
+
+export interface NavNpc {
+  id: string
+  x: number
+  z: number
+}
+
+export interface NavBoss {
+  id: string
+  name: string
+  x: number
+  z: number
+  arenaX: number
+  arenaZ: number
+  arenaR: number
+  intro: boolean
+}
+
+export interface NavSnapshot {
+  px: number
+  pz: number
+  heading: number
+  underwater: boolean
+  boatX: number
+  boatZ: number
+  boatHeading: number
+  boss: NavBoss | null
+  npcs: NavNpc[]
+}
+
+export interface SeaEventHud {
+  kind: 'ghost' | 'tentacle' | 'merchant' | 'storm'
+  name: string
+  desc: string
+  hint: string
+  progress: number
+  target: number
+  timeLeft: number
+  danger: boolean
+}
+
+export interface AchievementToast {
+  id: number
+  name: string
+  desc: string
+  reward: number
+  icon: string
 }

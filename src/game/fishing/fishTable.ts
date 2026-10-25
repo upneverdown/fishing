@@ -1,4 +1,4 @@
-import type { BaitId, Catch, CatchMethod, DayPeriod, Rarity, SeasonId } from '@/types'
+import type { BaitId, Catch, CatchMethod, DayPeriod, Rarity, SeasonId, WaterId } from '@/types'
 
 export interface RarityMeta {
   label: string
@@ -32,6 +32,7 @@ export interface FishDef {
   seasons?: SeasonId[]
   periods?: DayPeriod[]
   baits?: Partial<Record<BaitId, number>>
+  zones?: WaterId[]
 }
 
 export const FISH: FishDef[] = [
@@ -319,6 +320,102 @@ export const FISH: FishDef[] = [
     periods: ['night'],
     baits: { worm: 1.8, pellet: 1.7, minnow: 1.2 },
   },
+  {
+    id: 'mirrorcarp',
+    name: '镜影鲤',
+    rarity: 'rare',
+    minDepth: 1.8,
+    maxDepth: 6.4,
+    minKg: 1.2,
+    maxKg: 4.6,
+    pricePerKg: 88,
+    difficulty: 1.2,
+    desc: '镜湖里鳞片像碎银的鲤鱼，游过时水面会留下两道光。',
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    periods: ['dawn', 'day', 'dusk'],
+    baits: { dough: 1.8, pellet: 1.7 },
+    zones: ['mirror'],
+  },
+  {
+    id: 'farseasail',
+    name: '黑潮旗鱼',
+    rarity: 'epic',
+    minDepth: 1.6,
+    maxDepth: 6.6,
+    minKg: 8,
+    maxKg: 28,
+    pricePerKg: 150,
+    difficulty: 1.55,
+    desc: '背鳍像一面黑帆，只有穿过东侧海峡才见得到它的冲刺。',
+    seasons: ['summer', 'autumn'],
+    periods: ['day', 'dusk'],
+    baits: { spoon: 1.9, crank: 1.4 },
+    zones: ['farsea'],
+  },
+  {
+    id: 'tidemanta',
+    name: '潮鹰鲼',
+    rarity: 'rare',
+    minDepth: 2,
+    maxDepth: 7.2,
+    minKg: 5,
+    maxKg: 16,
+    pricePerKg: 76,
+    difficulty: 1.25,
+    desc: '在水里飞行的宽翼影子，从船底滑过时像一片会呼吸的云。',
+    seasons: ['spring', 'summer', 'autumn'],
+    periods: ['dawn', 'day'],
+    baits: { minnow: 1.5, spoon: 1.3 },
+    zones: ['farsea'],
+  },
+  {
+    id: 'sunfish',
+    name: '翻车鲀',
+    rarity: 'epic',
+    minDepth: 3,
+    maxDepth: 8.4,
+    minKg: 12,
+    maxKg: 42,
+    pricePerKg: 128,
+    difficulty: 1.5,
+    desc: '一块会游泳的圆石，懒洋洋地晒着外海的水面。',
+    seasons: ['summer', 'winter'],
+    periods: ['day'],
+    baits: { pellet: 1.4, dough: 1.2 },
+    zones: ['farsea'],
+  },
+  {
+    id: 'abyssangler',
+    name: '灯笼鮟鱇',
+    rarity: 'epic',
+    minDepth: 5,
+    maxDepth: 10.4,
+    minKg: 2,
+    maxKg: 8,
+    pricePerKg: 196,
+    difficulty: 1.5,
+    desc: '沟底唯一的一盏灯。它张开嘴时，那点冷光会先把你的影子吞掉。',
+    seasons: ['autumn', 'winter'],
+    periods: ['night'],
+    baits: { worm: 1.8, minnow: 1.6 },
+    zones: ['trench'],
+  },
+  {
+    id: 'trenchdrake',
+    name: '渊峡龙鱼',
+    rarity: 'legendary',
+    minDepth: 6,
+    maxDepth: 10.5,
+    minKg: 9,
+    maxKg: 30,
+    pricePerKg: 300,
+    difficulty: 1.85,
+    desc: '鳞片像旧刀鞘上的鎏金，龙王巡游时，它总在阴影里跟着。',
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
+    periods: ['night', 'dusk'],
+    baits: { spoon: 1.8, minnow: 1.7 },
+    zones: ['trench'],
+  },
 ]
 
 const FISH_BY_ID = new Map(FISH.map((f) => [f.id, f]))
@@ -332,6 +429,7 @@ export interface FishPickContext {
   period?: DayPeriod
   bait?: BaitId
   baitWear?: number
+  zone?: WaterId | null
 }
 
 export function baitPreference(def: FishDef, bait?: BaitId) {
@@ -359,7 +457,12 @@ export function pickFish(depth: number, ctx: FishPickContext = {}): FishDef {
       : 1
     const pref = baitPreference(f, ctx.bait)
     const baitBoost = 1 + (pref - 1) * freshness
-    const w = rarity.weight * depthBoost * seasonBoost * periodBoost * baitBoost
+    const zoneBoost = f.zones
+      ? ctx.zone && f.zones.includes(ctx.zone)
+        ? 4.5
+        : 0.05
+      : 1
+    const w = rarity.weight * depthBoost * seasonBoost * periodBoost * baitBoost * zoneBoost
     total += w
     return w
   })

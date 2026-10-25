@@ -405,20 +405,53 @@ const fallFragment = /* glsl */ `
 
   void main() {
     float t = uTime;
-    float wave = sin(vUv.y * 12.0 + t * 2.4) * 0.5 + 0.5;
-    float streak = sin(vUv.x * 96.0 + wave * 2.2) * 0.5 + 0.5;
-    float flow = sin(vUv.y * 46.0 - t * 7.0 + vUv.x * 6.0) * 0.5 + 0.5;
-    float alpha = 0.26 + streak * 0.55 * (0.4 + flow * 0.6);
-    alpha *= smoothstep(0.0, 0.1, vUv.y) * smoothstep(0.0, 0.08, 1.0 - vUv.y);
-    alpha *= smoothstep(0.0, 0.05, vUv.x) * smoothstep(0.0, 0.05, 1.0 - vUv.x);
-    vec3 color = mix(vec3(0.55, 0.88, 0.86), vec3(1.0), streak * 0.75);
+    float edge = smoothstep(0.0, 0.07, vUv.x) * smoothstep(0.0, 0.07, 1.0 - vUv.x);
+    float fade = smoothstep(0.02, 0.12, vUv.y) * smoothstep(0.0, 0.1, 1.0 - vUv.y);
+
+    float wave = sin(vUv.y * 14.0 + t * 2.1 + sin(vUv.x * 8.0 + t * 0.7) * 0.6) * 0.5 + 0.5;
+    float stream = sin(vUv.y * 42.0 - t * 8.4 + vUv.x * 8.0 + wave * 1.4) * 0.5 + 0.5;
+    stream = smoothstep(0.18, 0.92, stream);
+    float fine = sin(vUv.y * 104.0 - t * 17.0 + vUv.x * 26.0) * 0.5 + 0.5;
+    float shine = smoothstep(0.72, 1.0, fine);
+    float bottom = smoothstep(0.72, 1.0, 1.0 - vUv.y);
+    float top = smoothstep(0.5, 1.0, vUv.y);
+
+    vec3 deep = vec3(0.24, 0.58, 0.62);
+    vec3 light = vec3(0.9, 0.99, 1.0);
+    vec3 color = mix(deep, light, 0.2 + stream * 0.52 + shine * 0.26);
+    color += vec3(0.04, 0.11, 0.13) * sin(vUv.y * 20.0 - t * 3.2);
+    color += vec3(0.34, 0.5, 0.52) * bottom * 0.55;
+    color = mix(color, vec3(1.0), top * 0.18);
+
+    float alpha = (0.22 + stream * 0.38 + shine * 0.22 + bottom * 0.24) * edge * fade;
     gl_FragColor = vec4(color, alpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
 `
 
-export function createWaterfall(): { group: THREE.Group; material: THREE.ShaderMaterial } {
+function mistTexture() {
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  g.addColorStop(0, 'rgba(255,255,255,0.85)')
+  g.addColorStop(0.45, 'rgba(220,248,244,0.38)')
+  g.addColorStop(1, 'rgba(220,248,244,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, size, size)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
+export function createWaterfall(): {
+  group: THREE.Group
+  material: THREE.ShaderMaterial
+  update: (time: number, dt: number) => void
+} {
   const group = new THREE.Group()
 
   const cliffMat = new THREE.MeshStandardMaterial({ color: '#6c746b', roughness: 1, flatShading: true })
@@ -456,14 +489,101 @@ export function createWaterfall(): { group: THREE.Group; material: THREE.ShaderM
     opacity: 0.4,
     depthWrite: false,
   })
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const foam = new THREE.Mesh(new THREE.CircleGeometry(1.4 + i * 0.9, 18), foamMat.clone())
     foam.rotation.x = -Math.PI / 2
     foam.position.set(38.5 + (i % 2 === 0 ? -1 : 1) * 0.9, 0.06, 60.6 + i * 0.55)
     group.add(foam)
   }
 
-  return { group, material }
+  const splashCount = 110
+  const splashPositions = new Float32Array(splashCount * 3)
+  const splashVelocity = new Float32Array(splashCount * 3)
+  const splashLife = new Float32Array(splashCount)
+  const splashGeo = new THREE.BufferGeometry()
+  splashGeo.setAttribute('position', new THREE.BufferAttribute(splashPositions, 3))
+  const splash = new THREE.Points(
+    splashGeo,
+    new THREE.PointsMaterial({
+      size: 0.42,
+      map: mistTexture(),
+      color: '#e8fffb',
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    }),
+  )
+  splash.frustumCulled = false
+  group.add(splash)
+
+  const mistTex = mistTexture()
+  const mists: THREE.Sprite[] = []
+  for (let i = 0; i < 7; i++) {
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: mistTex,
+        color: '#dff7f3',
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+    sprite.position.set(
+      38.5 + (Math.random() - 0.5) * 7.4,
+      1.2 + Math.random() * 3.4,
+      60.4 + (Math.random() - 0.5) * 3.4,
+    )
+    const size = 7 + Math.random() * 7
+    sprite.scale.set(size, size * 0.7, 1)
+    group.add(sprite)
+    mists.push(sprite)
+  }
+
+  const respawn = (i: number) => {
+    const angle = Math.random() * Math.PI * 2
+    const radius = Math.random() * 2.6
+    splashPositions[i * 3] = 38.5 + Math.cos(angle) * radius
+    splashPositions[i * 3 + 1] = 0.15 + Math.random() * 0.5
+    splashPositions[i * 3 + 2] = 61.2 + Math.sin(angle) * radius * 0.5
+    splashVelocity[i * 3] = Math.cos(angle) * (1.4 + Math.random() * 2.4)
+    splashVelocity[i * 3 + 1] = 2.8 + Math.random() * 4.2
+    splashVelocity[i * 3 + 2] = (Math.random() - 0.5) * 2.2
+    splashLife[i] = 0.5 + Math.random() * 0.9
+  }
+  for (let i = 0; i < splashCount; i++) {
+    respawn(i)
+    splashLife[i] = Math.random() * 1.4
+  }
+
+  const update = (time: number, dt: number) => {
+    for (let i = 0; i < splashCount; i++) {
+      splashLife[i] -= dt
+      if (splashLife[i] <= 0) respawn(i)
+      splashVelocity[i * 3 + 1] -= 9.4 * dt
+      splashPositions[i * 3] += splashVelocity[i * 3] * dt
+      splashPositions[i * 3 + 1] += splashVelocity[i * 3 + 1] * dt
+      splashPositions[i * 3 + 2] += splashVelocity[i * 3 + 2] * dt
+      if (splashPositions[i * 3 + 1] < 0.05) respawn(i)
+    }
+    ;(splashGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
+
+    for (let i = 0; i < mists.length; i++) {
+      const sprite = mists[i]
+      const phase = time * (0.32 + i * 0.045) + i * 1.7
+      sprite.position.y = 1.3 + Math.sin(phase) * 1.1 + (i % 3) * 0.55
+      sprite.position.x = 38.5 + Math.sin(phase * 0.6 + i) * 3.4
+      const breathe = 0.5 + 0.5 * Math.sin(phase * 1.3 + i)
+      const size = 6.5 + breathe * 5.5
+      sprite.scale.set(size, size * 0.65, 1)
+      ;(sprite.material as THREE.SpriteMaterial).opacity = 0.06 + breathe * 0.11
+      ;(sprite.material as THREE.SpriteMaterial).rotation = Math.sin(phase * 0.5) * 0.35
+    }
+  }
+
+  return { group, material, update }
 }
 
 export interface Buoy {

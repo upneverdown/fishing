@@ -141,6 +141,140 @@
   }
 }
 
+@keyframes lightning-flash {
+  0% {
+    opacity: 0;
+  }
+  7% {
+    opacity: 1;
+  }
+  14% {
+    opacity: 0.12;
+  }
+  22% {
+    opacity: 0.78;
+  }
+  36% {
+    opacity: 0.14;
+  }
+  52% {
+    opacity: 0.42;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.lightning-flash {
+  animation: lightning-flash 620ms ease-out both;
+  mix-blend-mode: screen;
+}
+
+@keyframes flame-flicker {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1) rotate(-2deg);
+    opacity: 0.82;
+  }
+  24% {
+    transform: translateY(-4px) scale(0.93, 1.1) rotate(3deg);
+    opacity: 1;
+  }
+  52% {
+    transform: translateY(-2px) scale(1.06, 0.94) rotate(-1deg);
+    opacity: 0.9;
+  }
+  78% {
+    transform: translateY(-6px) scale(0.9, 1.16) rotate(2deg);
+    opacity: 0.96;
+  }
+}
+
+@keyframes pot-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, -3px);
+  }
+}
+
+.pot-bob {
+  animation: pot-bob 1.6s ease-in-out infinite;
+}
+
+@keyframes steam-rise {
+  0% {
+    transform: translateY(6px) scale(0.7);
+    opacity: 0;
+  }
+  28% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-30px) scale(1.65);
+    opacity: 0;
+  }
+}
+
+.flame {
+  display: block;
+  width: 16px;
+  height: 40px;
+  border-radius: 50% 50% 42% 42% / 62% 62% 38% 38%;
+  filter: blur(0.4px);
+  opacity: 0.55;
+  transform-origin: bottom center;
+}
+
+.flame-outer {
+  background: radial-gradient(circle at 50% 78%, #ff8a2b, rgba(226, 104, 90, 0.35) 62%, transparent 72%);
+  width: 24px;
+  height: 56px;
+}
+
+.flame-inner {
+  background: radial-gradient(circle at 50% 74%, #ffd36b, rgba(255, 178, 60, 0.4) 60%, transparent 72%);
+  width: 18px;
+  height: 42px;
+}
+
+.flame-core {
+  background: radial-gradient(circle at 50% 70%, #fff6d0, rgba(255, 215, 120, 0.5) 55%, transparent 72%);
+  width: 10px;
+  height: 26px;
+}
+
+.flame-live {
+  animation: flame-flicker 900ms ease-in-out infinite;
+}
+
+.flame-live.flame-inner {
+  animation-duration: 760ms;
+  animation-delay: 80ms;
+}
+
+.flame-live.flame-core {
+  animation-duration: 620ms;
+  animation-delay: 140ms;
+}
+
+.steam {
+  position: absolute;
+  bottom: 52%;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(236, 244, 238, 0.55);
+  opacity: 0;
+  filter: blur(3px);
+}
+
+.steam-live {
+  animation: steam-rise 2.1s ease-out infinite;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

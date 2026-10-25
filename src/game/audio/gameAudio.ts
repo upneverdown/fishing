@@ -189,8 +189,42 @@ class GameAudio {
     src.stop(now + 0.18)
   }
 
-  caught() {
+  thunder() {
     const ctx = this.ctx
+    const master = this.master
+    if (!ctx || !master || !this.brown || !this.white || this.muted) return
+    const now = ctx.currentTime
+
+    const rumble = ctx.createBufferSource()
+    rumble.buffer = this.brown
+    rumble.loop = true
+    const low = ctx.createBiquadFilter()
+    low.type = 'lowpass'
+    low.frequency.setValueAtTime(420, now)
+    low.frequency.exponentialRampToValueAtTime(90, now + 2.4)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.26, now + 0.12)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.6)
+    rumble.connect(low).connect(gain).connect(master)
+    rumble.start(now)
+    rumble.stop(now + 2.7)
+
+    const crack = ctx.createBufferSource()
+    crack.buffer = this.white
+    const high = ctx.createBiquadFilter()
+    high.type = 'highpass'
+    high.frequency.value = 1100
+    const crackGain = ctx.createGain()
+    crackGain.gain.setValueAtTime(0.0001, now)
+    crackGain.gain.exponentialRampToValueAtTime(0.14, now + 0.02)
+    crackGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32)
+    crack.connect(high).connect(crackGain).connect(master)
+    crack.start(now)
+    crack.stop(now + 0.36)
+  }
+
+  caught() {    const ctx = this.ctx
     if (!ctx || this.muted) return
     const now = ctx.currentTime
     const notes = [523.25, 659.25, 783.99]

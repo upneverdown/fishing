@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Anchor,
   Box,
@@ -5,23 +6,42 @@ import {
   Coins,
   Fish,
   Flag,
+  Flame,
+  Flashlight,
   Lightbulb,
+  Radar,
   Ship,
   Sparkles,
+  Waves,
+  Wrench,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BoatPreview } from '@/components/BoatPreview'
 import { useGameStore } from '@/store/useGameStore'
 import {
   BOAT_STYLES,
   DECORATIONS,
   ROD_SKINS,
+  boatFacilitySlots,
   type BoatSkinId,
   type DecorationId,
 } from '@/game/shop/catalog'
+import { FACILITIES, facilityById } from '@/game/boat/facilities'
+import { waterById } from '@/game/world/waters'
 import { cn } from '@/lib/utils'
+import type { FacilityId } from '@/types'
+
+const FACILITY_ICONS: Record<FacilityId, LucideIcon> = {
+  fishfinder: Radar,
+  livewell: Waves,
+  searchlight: Flashlight,
+  grill: Flame,
+  anchor: Anchor,
+}
 
 function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string }) {
   return (
@@ -72,6 +92,23 @@ function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string })
           <path d="M14 34 L27 34" stroke={accent} strokeWidth="2" />
           <circle cx="60" cy="40" r="2" fill="#b8e6e0" fillOpacity="0.8" />
           <path d="M30 47 H108" stroke={accent} strokeWidth="2" strokeOpacity="0.6" />
+        </g>
+      )}
+      {variant === 'icebreaker' && (
+        <g>
+          <path d="M18 38 H120 L112 50 Q70 55 30 50 Z" fill="#4d6068" />
+          <path d="M20 38 H118 L114 42.5 H24 Z" fill={accent} />
+          <path d="M20 43 L27 50 H44 L37 43 Z" fill="#ff9d5c" />
+          <rect x="50" y="24" width="42" height="14" rx="2" fill="#dfe8e6" />
+          <rect x="55" y="27" width="12" height="6" rx="1" fill="#b8e6e0" fillOpacity="0.7" />
+          <rect x="72" y="27" width="9" height="6" rx="1" fill="#b8e6e0" fillOpacity="0.45" />
+          <path d="M72 24 V12" stroke="#93a6ad" strokeWidth="2" />
+          <path d="M72 12 L82 15 L72 18 Z" fill={accent} />
+          <path d="M110 38 V28 H118 V38" fill="#93a6ad" />
+          <path d="M96 38 V32 H104 V38" fill="#93a6ad" />
+          <path d="M28 47 H108" stroke={accent} strokeWidth="2" strokeOpacity="0.5" />
+          <path d="M122 45 l7 -3 3 4 -7 4 Z" fill="#cfe9ea" fillOpacity="0.5" />
+          <path d="M10 49 l6 -3 3 4 -6 3 Z" fill="#cfe9ea" fillOpacity="0.4" />
         </g>
       )}
     </svg>
@@ -137,8 +174,29 @@ export function ShipyardDialog() {
   const equipBoat = useGameStore((s) => s.equipBoat)
   const equipRod = useGameStore((s) => s.equipRod)
   const toggleDecoration = useGameStore((s) => s.toggleDecoration)
+  const ownedFacilities = useGameStore((s) => s.ownedFacilities)
+  const installedFacilities = useGameStore((s) => s.installedFacilities)
+  const facilityActive = useGameStore((s) => s.facilityActive)
+  const buyFacility = useGameStore((s) => s.buyFacility)
+  const installFacility = useGameStore((s) => s.installFacility)
+  const toggleFacility = useGameStore((s) => s.toggleFacility)
+  const toast = useGameStore((s) => s.toast)
+  const [selectedBoat, setSelectedBoat] = useState<BoatSkinId>(boatSkin)
 
   const close = () => setShopOpen(false)
+  const slots = boatFacilitySlots(boatSkin)
+  const installedCount = installedFacilities.filter(Boolean).length
+  const emptySlot = Array.from({ length: slots }, (_, i) => installedFacilities[i] ?? null).findIndex(
+    (slot) => slot === null,
+  )
+  const installToFirstEmpty = (id: FacilityId) => {
+    if (emptySlot < 0) {
+      toast('设施槽已经满了 · 先卸下一件', 'info')
+      return
+    }
+    installFacility(emptySlot, id)
+  }
+  const previewStyle = BOAT_STYLES.find((style) => style.id === selectedBoat) ?? BOAT_STYLES[0]
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>
@@ -190,25 +248,86 @@ export function ShipyardDialog() {
               鱼竿
               <span className="tnum text-[9px] text-foam/35">{ROD_SKINS.length}</span>
             </TabsTrigger>
+            <TabsTrigger value="facilities" className="flex-1 gap-1.5">
+              <Wrench className="size-3.5" />
+              设施
+              <span className="tnum text-[9px] text-foam/35">
+                {installedCount}/{slots}
+              </span>
+            </TabsTrigger>
             <TabsTrigger value="decor" className="flex-1 gap-1.5">
               <Sparkles className="size-3.5" />
               装饰
-              <span className="tnum text-[9px] text-foam/35">{DECORATIONS.length}</span>
+              <span className="tnum hidden text-[9px] text-foam/35 sm:inline">{DECORATIONS.length}</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="boats" className="mt-2.5">
-            <div className="grid max-h-[min(56dvh,430px)] grid-cols-1 gap-2.5 overflow-y-auto pr-0.5 sm:grid-cols-2">
+            <div className="max-h-[min(68dvh,610px)] overflow-y-auto pr-0.5">
+              <div className="mb-2.5 overflow-hidden rounded-xl border border-border/50 bg-[radial-gradient(ellipse_at_50%_0%,rgba(93,216,201,0.16),rgba(7,27,29,0.55))]">
+                <div className="flex items-start justify-between gap-2 px-3 pt-2">
+                  <div>
+                    <div className="text-[13px] font-semibold tracking-wide text-foam">
+                      {previewStyle.name}
+                      <span className="ml-1.5 text-[10px] font-normal text-foam/40">
+                        {previewStyle.title}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[9px] text-tide/75">
+                      {previewStyle.classLabel} · 第{previewStyle.tier}级
+                      {previewStyle.weatherproof ? ' · 全天候' : ' · 近岸'}
+                    </div>
+                  </div>
+                  <span className="tnum rounded-full border border-gold/25 bg-gold/8 px-2 py-0.5 text-[9px] text-gold/80">
+                    载重 {previewStyle.capacity}
+                  </span>
+                </div>
+                <BoatPreview skin={selectedBoat} className="h-[148px] w-full sm:h-[188px]" />
+                <div className="grid grid-cols-4 gap-1 border-t border-white/8 px-2 py-1.5 text-center">
+                  {[
+                    ['载重', `${previewStyle.capacity}`],
+                    ['装备位', `${previewStyle.gearCap}`],
+                    ['设施槽', `${previewStyle.facilitySlots}`],
+                    ['耐久', `${previewStyle.durability}`],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md bg-abyss/35 py-1">
+                      <div className="tnum text-[11px] font-semibold text-foam/80">{value}</div>
+                      <div className="text-[7.5px] tracking-[0.12em] text-foam/30">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1 px-2 pb-2 pt-1">
+                  <span className="text-[8px] uppercase tracking-[0.16em] text-foam/30">可航</span>
+                  {previewStyle.waters.map((waterId) => {
+                    const water = waterById(waterId)
+                    if (!water) return null
+                    return (
+                      <span
+                        key={waterId}
+                        className="rounded-full px-1.5 py-0.5 text-[8.5px]"
+                        style={{ background: `${water.color}18`, color: water.color }}
+                      >
+                        {water.name}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 pb-0.5 sm:grid-cols-2">
               {BOAT_STYLES.map((style) => {
                 const owned = ownedItems.includes(style.id)
                 const equipped = boatSkin === style.id
                 const affordable = money >= style.price
+                const selected = selectedBoat === style.id
                 return (
                   <div
                     key={style.id}
+                    onMouseEnter={() => setSelectedBoat(style.id)}
+                    onClick={() => setSelectedBoat(style.id)}
                     className={cn(
-                      'overflow-hidden rounded-xl border bg-card/40',
-                      equipped ? 'border-gold/55' : 'border-border/50',
+                      'cursor-pointer overflow-hidden rounded-xl border bg-card/40 transition-colors',
+                      equipped ? 'border-gold/55' : selected ? 'border-tide/55' : 'border-border/50',
                     )}
                   >
                     <div className="relative h-[96px] bg-[radial-gradient(ellipse_at_50%_25%,rgba(93,216,201,0.12),rgba(7,27,29,0.2))] px-2 pt-1">
@@ -234,6 +353,12 @@ export function ShipyardDialog() {
                       <p className="line-clamp-2 min-h-[28px] text-[10.5px] leading-relaxed text-muted-foreground">
                         {style.tagline}
                       </p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[8.5px] text-foam/35">
+                        <span>{style.classLabel} · 第{style.tier}级</span>
+                        <span>载重 {style.capacity}</span>
+                        <span>设施槽 {style.facilitySlots}</span>
+                        <span>耐久 {style.durability}</span>
+                      </div>
                       <div className="mt-0.5 flex items-center justify-between gap-2">
                         <span
                           className={cn(
@@ -270,6 +395,7 @@ export function ShipyardDialog() {
                   </div>
                 )
               })}
+              </div>
             </div>
           </TabsContent>
 
@@ -342,6 +468,205 @@ export function ShipyardDialog() {
                   </div>
                 )
               })}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="facilities" className="mt-2.5">
+            <div className="max-h-[min(64dvh,570px)] space-y-2.5 overflow-y-auto pr-0.5">
+              <div className="flex items-center justify-between rounded-lg border border-border/45 bg-abyss/30 px-3 py-2">
+                <div>
+                  <div className="text-[11.5px] font-medium text-foam">
+                    {BOAT_STYLES.find((style) => style.id === boatSkin)?.name ?? '当前船体'} · 设施槽
+                  </div>
+                  <div className="mt-0.5 text-[9px] text-foam/35">
+                    拖拽设施到槽位，或点「安装」自动放进空槽
+                  </div>
+                </div>
+                <span className="tnum rounded-full bg-tide/12 px-2 py-1 text-[10px] text-tide">
+                  {installedCount}/{slots}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {Array.from({ length: slots }).map((_, index) => {
+                  const id = installedFacilities[index] ?? null
+                  const def = id ? facilityById(id) : undefined
+                  const Icon = id ? FACILITY_ICONS[id] : null
+                  const active = id ? Boolean(facilityActive[id]) : false
+                  return (
+                    <div
+                      key={index}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const dropped = e.dataTransfer.getData('text/facility') as FacilityId
+                        if (dropped) installFacility(index, dropped)
+                      }}
+                      className={cn(
+                        'flex flex-col rounded-xl border p-2 transition-colors',
+                        def
+                          ? 'border-tide/35 bg-tide/5'
+                          : 'border-dashed border-border/55 bg-abyss/25',
+                      )}
+                    >
+                      <div className="flex items-center justify-between text-[8.5px] text-foam/30">
+                        <span className="tnum">#{index + 1}</span>
+                        {id && (
+                          <button
+                            type="button"
+                            onClick={() => installFacility(index, null)}
+                            className="grid size-4 place-items-center rounded-full text-foam/35 hover:bg-foam/10 hover:text-destructive"
+                            aria-label="卸下设施"
+                          >
+                            <X className="size-2.5" />
+                          </button>
+                        )}
+                      </div>
+                      {def && Icon ? (
+                        <div className="mt-1 flex flex-1 flex-col">
+                          <span
+                            className="grid size-7 place-items-center rounded-full"
+                            style={{ background: `${def.color}1c`, color: def.color }}
+                          >
+                            <Icon className="size-3.5" />
+                          </span>
+                          <div className="mt-1 text-[11px] font-medium text-foam">{def.name}</div>
+                          <div className="mt-0.5 text-[8.5px] text-foam/40">{def.effect}</div>
+                          {def.toggle && (
+                            <button
+                              type="button"
+                              onClick={() => toggleFacility(def.id)}
+                              className={cn(
+                                'mt-1.5 rounded-md px-1.5 py-0.5 text-[8.5px] transition-colors',
+                                active
+                                  ? 'bg-gold/15 text-gold'
+                                  : 'bg-foam/6 text-foam/45 hover:text-foam/80',
+                              )}
+                            >
+                              {active ? '开启中' : '已关闭'}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid flex-1 place-items-center py-2 text-center text-[8.5px] text-foam/25">
+                          <span>
+                            <Wrench className="mx-auto mb-1 size-3.5" />
+                            空槽
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {FACILITIES.map((facility) => {
+                  const owned = ownedFacilities.includes(facility.id)
+                  const installedIndex = installedFacilities.indexOf(facility.id)
+                  const installed = installedIndex >= 0
+                  const active = Boolean(facilityActive[facility.id])
+                  const affordable = money >= facility.price
+                  const Icon = FACILITY_ICONS[facility.id]
+                  return (
+                    <div
+                      key={facility.id}
+                      draggable={owned}
+                      onDragStart={(e) => {
+                        if (!owned) {
+                          e.preventDefault()
+                          return
+                        }
+                        e.dataTransfer.setData('text/facility', facility.id)
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      className={cn(
+                        'flex gap-2.5 rounded-xl border p-2.5 transition-colors',
+                        installed
+                          ? 'border-tide/35 bg-tide/5'
+                          : owned
+                            ? 'cursor-grab border-border/50 bg-card/45 active:cursor-grabbing'
+                            : 'border-border/45 bg-card/30',
+                      )}
+                    >
+                      <span
+                        className="grid size-9 shrink-0 place-items-center self-start rounded-full"
+                        style={{ background: `${facility.color}1a`, color: facility.color }}
+                      >
+                        <Icon className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[12px] font-semibold text-foam">{facility.name}</span>
+                          <span
+                            className="rounded-full px-1.5 py-0.5 text-[8px]"
+                            style={{ background: `${facility.color}18`, color: facility.color }}
+                          >
+                            {facility.effect}
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[9.5px] leading-relaxed text-foam/40">
+                          {facility.tagline}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          {!owned ? (
+                            <>
+                              <span
+                                className={cn(
+                                  'tnum text-[10px]',
+                                  affordable ? 'text-gold' : 'text-destructive/80',
+                                )}
+                              >
+                                ¥{facility.price}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={!affordable}
+                                onClick={() => buyFacility(facility.id)}
+                                className="ml-auto rounded-md bg-gold/12 px-2 py-1 text-[9px] text-gold transition-colors hover:bg-gold/22 disabled:opacity-30"
+                              >
+                                购入
+                              </button>
+                            </>
+                          ) : installed ? (
+                            <>
+                              <span className="text-[8.5px] text-tide/70">已装于 {installedIndex + 1} 号槽</span>
+                              <button
+                                type="button"
+                                onClick={() => installFacility(installedIndex, null)}
+                                className="ml-auto rounded-md border border-border/45 px-1.5 py-1 text-[8.5px] text-foam/50 hover:border-destructive/40 hover:text-destructive"
+                              >
+                                卸下
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[8.5px] text-foam/35">
+                                {facility.toggle ? '可开关' : '常驻生效'}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={emptySlot < 0}
+                                onClick={() => installToFirstEmpty(facility.id)}
+                                className="ml-auto rounded-md bg-foam/8 px-2 py-1 text-[9px] text-foam/70 transition-colors hover:bg-foam/16 disabled:opacity-30"
+                              >
+                                {emptySlot < 0 ? '槽位已满' : '安装'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="rounded-md bg-foam/4 px-2.5 py-1.5 text-[9px] leading-relaxed text-foam/35">
+                换船后设施会留在仓库，按新船的槽位重新安装即可。探照灯按 L、船锚按 Y、船载烤架按 H 可直接操作。
+              </div>
             </div>
           </TabsContent>
 

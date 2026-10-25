@@ -3,13 +3,16 @@ import type { Boat } from '@/game/entities/boat'
 import type { World } from '@/game/world/world'
 import { Bobber } from './bobber'
 import { RARITY_ORDER, createCatch, pickFish, type FishDef } from './fishTable'
+import { createJunk } from './junkTable'
 import { baitById } from './baitTable'
 import { SEASONS } from '@/game/world/seasons'
 import { input } from '@/game/input'
+import { gameEvents } from '@/game/eventBus'
 import { isModalOpen, useGameStore } from '@/store/useGameStore'
 import { clamp, lerp, randRange } from '@/game/utils/math'
 import { audio } from '@/game/audio/gameAudio'
 import { gearValue } from '@/game/gear/gear'
+import { waterAt } from '@/game/world/waters'
 import type { Catch, FishingPhase } from '@/types'
 
 const MIN_CAST = 7
@@ -47,6 +50,7 @@ export class FishingSystem {
   private waitTime = 0
   private biteTime = 0
   private def: FishDef | null = null
+  private castSpeed = 0
 
   private progress = 0
   private tension = 0
@@ -116,6 +120,7 @@ export class FishingSystem {
       period: SEASONS[store.season].period,
       bait: store.baitId,
       baitWear: store.baitWear,
+      zone: waterAt(this.anchor.x, this.anchor.z)?.id ?? null,
     })
   }
 
@@ -238,6 +243,7 @@ export class FishingSystem {
   }
 
   private cast(time: number) {
+    this.castSpeed = Math.abs(this.boat.speed)
     const fwd = this.boat.getForward(this.boatFwd)
     const dist = MIN_CAST + (MAX_CAST - MIN_CAST) * this.power
     this.anchor.set(
@@ -398,7 +404,8 @@ export class FishingSystem {
     const def = this.def
     if (!def) return
 
-    const caught = createCatch(def)
+    const junkChance = this.castSpeed >= 2 ? 0.5 : 0.07
+    const caught = Math.random() < junkChance ? createJunk() : createCatch(def)
     const added = store.addCatch(caught)
     store.setFight(null)
     store.setBite(false)
@@ -421,8 +428,14 @@ export class FishingSystem {
     this.line.visible = false
     this.hideAim()
 
-    if (!added) store.toast('鱼篓满了，这条鱼只能放回水里', 'danger')
-    else store.toast(`上鱼！${caught.name} · ${caught.kg}kg`, 'gold')
+    if (!added) {
+      store.toast('鱼篓满了，这条鱼只能放回水里', 'danger')
+    } else if (!caught.junk) {
+      store.toast(`上鱼！${caught.name} · ${caught.kg}kg`, 'gold')
+    }
+    if (caught.junk && added) {
+      gameEvents.emit('catch:junk', { defId: caught.defId, speed: this.castSpeed })
+    }
   }
 
   private spawnJump() {
