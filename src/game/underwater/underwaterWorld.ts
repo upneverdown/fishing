@@ -347,6 +347,7 @@ export class UnderwaterWorld {
   }
 
   update(time: number, dt: number, center: THREE.Vector3) {
+<<<<<<< HEAD
     this.group.visible = true
     this.simulate(time, dt, center)
   }
@@ -359,6 +360,11 @@ export class UnderwaterWorld {
   private simulate(time: number, dt: number, center: THREE.Vector3) {
     this.lastTime = time
     this.regenerateDecor(center)
+=======
+    this.lastTime = time
+    this.regenerateDecor(center)
+    this.group.visible = true
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (this.reserves.length) {
       const ready = this.reserves.filter((r) => time >= r.at)

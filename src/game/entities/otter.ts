@@ -5,6 +5,7 @@ const bellyMat = new THREE.MeshStandardMaterial({ color: '#d8bb92', roughness: 0
 const darkMat = new THREE.MeshStandardMaterial({ color: '#2a2018', roughness: 0.6 })
 const whiskerMat = new THREE.MeshStandardMaterial({ color: '#efe3cd', roughness: 0.8 })
 
+<<<<<<< HEAD
 const FOLLOW_DISTANCE = 2.15
 const TELEPORT_DISTANCE = 16
 
@@ -23,6 +24,19 @@ export class Otter {
 
   constructor(scene: THREE.Scene) {
     this.group.visible = true
+=======
+export class Otter {
+  readonly group = new THREE.Group()
+  private target = new THREE.Vector3()
+  private look = new THREE.Vector3()
+  private tail = new THREE.Group()
+  private body = new THREE.Group()
+  private head = new THREE.Group()
+  private bobPhase = Math.random() * Math.PI * 2
+
+  constructor(scene: THREE.Scene) {
+    this.group.visible = false
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     scene.add(this.group)
 
     const torso = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), furMat)
@@ -52,8 +66,11 @@ export class Otter {
       const ear = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), furMat)
       ear.position.set(side * 0.16, 0.17, 0.02)
       this.head.add(ear)
+<<<<<<< HEAD
       if (side < 0) this.earL = ear
       else this.earR = ear
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), darkMat)
       eye.position.set(side * 0.1, 0.06, 0.17)
       this.head.add(eye)
@@ -93,6 +110,7 @@ export class Otter {
     boatPos: THREE.Vector3,
     diverPos: THREE.Vector3,
     affection: number,
+<<<<<<< HEAD
     heading: number,
   ) {
     const anchor = underwater ? diverPos : boatPos
@@ -147,6 +165,32 @@ export class Otter {
     const earTwitch = Math.sin(time * 2.9 + this.bobPhase) * 0.12
     if (this.earL) this.earL.scale.y = 0.9 + earTwitch
     if (this.earR) this.earR.scale.y = 0.9 - earTwitch * 0.7
+=======
+  ) {
+    const unlocked = affection >= 25
+    this.group.visible = unlocked
+    if (!unlocked) return
+
+    if (underwater) {
+      this.target.set(diverPos.x + 1.4, diverPos.y - 0.55, diverPos.z + 1.1)
+      this.group.position.lerp(this.target, 1 - Math.exp(-dt * 2.4))
+    } else {
+      this.target.set(boatPos.x - 1.6, boatPos.y + 0.06, boatPos.z - 1.2)
+      const wave = Math.sin(time * 1.3 + this.bobPhase) * 0.06
+      this.target.y += wave
+      this.group.position.lerp(this.target, 1 - Math.exp(-dt * 1.8))
+    }
+
+    const speed = this.group.position.distanceToSquared(this.target)
+    const wiggle = Math.sin(time * (underwater ? 5.2 : 2.6) + this.bobPhase) * (0.18 + Math.min(0.5, speed))
+    this.tail.rotation.y = wiggle
+    this.tail.rotation.x = Math.sin(time * 3 + this.bobPhase) * 0.12
+    this.head.rotation.y = Math.sin(time * 0.8 + this.bobPhase) * 0.22
+    this.head.rotation.x = underwater ? -0.08 : Math.sin(time * 1.7) * 0.08
+    this.body.rotation.z = Math.sin(time * 1.5 + this.bobPhase) * 0.06
+    this.look.copy(underwater ? diverPos : boatPos).sub(this.group.position)
+    this.group.rotation.y = Math.atan2(this.look.x, this.look.z)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   dispose(scene: THREE.Scene) {

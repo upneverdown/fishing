@@ -11,7 +11,10 @@ export const SPAWN = { x: 2, z: 17, heading: 0 }
 
 export const TRENCH = { x: -82, z: -58, r: 30, name: '沉船深沟' }
 export const MIRROR_LAKE = { x: 88, z: -42, r: 34, name: '镜湖' }
+<<<<<<< HEAD
 export const FAR_SEA = { x: 128, z: 8, r: 35, name: '黑潮外海' }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 export const SPOTS = [
   { x: 0, z: 18, name: '主海湾深水区' },
@@ -19,8 +22,11 @@ export const SPOTS = [
   { x: 40, z: 46, name: '瀑布深潭' },
   { x: 88, z: -42, name: '镜湖心' },
   { x: -82, z: -58, name: '沉船深沟' },
+<<<<<<< HEAD
   { x: 128, z: 8, name: '黑潮外海' },
   { x: 112, z: -22, name: '潮汐海峡' },
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 ]
 
 interface WaterCircle {
@@ -41,9 +47,12 @@ const WATER: WaterCircle[] = [
   { x: 88, z: -42, r: 34 },
   { x: 66, z: -33, r: 16 },
   { x: 40, z: -20, r: 14 },
+<<<<<<< HEAD
   { x: 104, z: -29, r: 15 },
   { x: 112, z: -22, r: 18 },
   { x: 128, z: 8, r: 35 },
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 ]
 
 const K = 0.55
@@ -98,8 +107,11 @@ export function isWater(x: number, z: number): boolean {
 
 export function zoneAt(x: number, z: number): string {
   if (Math.hypot(x - TRENCH.x, z - TRENCH.z) < TRENCH.r + 4) return TRENCH.name
+<<<<<<< HEAD
   if (Math.hypot(x - FAR_SEA.x, z - FAR_SEA.z) < FAR_SEA.r + 4) return FAR_SEA.name
   if (Math.hypot(x - 112, z + 22) < 22) return '潮汐海峡'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   if (Math.hypot(x - MIRROR_LAKE.x, z - MIRROR_LAKE.z) < MIRROR_LAKE.r + 4) return MIRROR_LAKE.name
   if (z > 31 && x > 13) return '瀑布深潭'
   if (x < -33) return '林间小湾'

@@ -14,12 +14,15 @@ export type CatchMethod = 'rod' | 'harpoon' | 'net' | 'trap'
 
 export type CaptureToolId = 'harpoon' | 'net' | 'trap'
 
+<<<<<<< HEAD
 export type WaterId = 'bay' | 'creek' | 'falls' | 'mirror' | 'farsea' | 'trench'
 
 export type WeaponId = 'knife' | 'speargun'
 
 export type FacilityId = 'fishfinder' | 'livewell' | 'searchlight' | 'grill' | 'anchor'
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 export type Quality = 'raw' | 'good' | 'perfect' | 'burnt'
 
 export type TownTab = 'quests' | 'farm' | 'kitchen' | 'codex' | 'cabin' | 'shop'
@@ -54,7 +57,10 @@ export interface Catch {
   desc: string
   caughtAt: number
   method?: CatchMethod
+<<<<<<< HEAD
   junk?: boolean
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 export interface FightState {
@@ -73,6 +79,7 @@ export interface Vec2 {
   x: number
   z: number
 }
+<<<<<<< HEAD
 
 export interface BoatPose {
   x: number
@@ -148,3 +155,5 @@ export interface AchievementToast {
   reward: number
   icon: string
 }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a

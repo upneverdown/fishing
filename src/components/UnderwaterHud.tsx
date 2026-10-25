@@ -17,13 +17,20 @@ import {
 } from 'lucide-react'
 import { input } from '@/game/input'
 import {
+<<<<<<< HEAD
   bagCapacity,
+=======
+  BAG_CAPACITY,
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   isModalOpen,
   UNDERWATER_MODE_LABEL,
   useGameStore,
 } from '@/store/useGameStore'
 import { CAPTURE_TOOLS, toolStats } from '@/game/capture/tools'
+<<<<<<< HEAD
 import { variantById, variantStats } from '@/game/capture/variants'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { useIsTouch } from '@/hooks/useMediaQuery'
 import { Joystick } from '@/components/TouchControls'
 import { FishArt } from '@/components/FishArt'
@@ -41,6 +48,7 @@ const TOOL_ICONS: Record<CaptureToolId, LucideIcon> = {
 }
 
 const HINTS = [
+<<<<<<< HEAD
   { keys: ['W', 'A', 'S', 'D'], label: '游动 / 横移' },
   { keys: ['Space'], label: '上浮' },
   { keys: ['Shift'], label: '下潜' },
@@ -52,6 +60,15 @@ const HINTS = [
   { keys: ['Z'], label: '挥刀' },
   { keys: ['X'], label: '鱼枪射击' },
   { keys: ['F'], label: '开宝箱 / 切换视角' },
+=======
+  { keys: ['W', 'A', 'S', 'D'], label: '游动' },
+  { keys: ['Space', 'Ctrl'], label: '上浮 / 下潜' },
+  { keys: ['Shift'], label: '加速游动' },
+  { keys: ['1', '2', '3'], label: '换捕捞工具' },
+  { keys: ['E', '点击'], label: '出手捕捞' },
+  { keys: ['点击'], label: '观察鱼群' },
+  { keys: ['F'], label: '切换水下视角' },
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   { keys: ['V'], label: '浮回水面' },
 ]
 
@@ -114,8 +131,11 @@ function ObservedFish() {
 function ToolDock({ compact = false }: { compact?: boolean }) {
   const activeTool = useGameStore((s) => s.activeTool)
   const tools = useGameStore((s) => s.tools)
+<<<<<<< HEAD
   const toolVariants = useGameStore((s) => s.toolVariants)
   const variantAmmo = useGameStore((s) => s.variantAmmo)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const trapCount = useGameStore((s) => s.traps.length)
   const setActiveTool = useGameStore((s) => s.setActiveTool)
 
@@ -126,14 +146,21 @@ function ToolDock({ compact = false }: { compact?: boolean }) {
         const Icon = TOOL_ICONS[tool.id]
         const active = activeTool === tool.id
         const broken = state.wear <= 0
+<<<<<<< HEAD
         const variant = tool.id === 'trap' ? undefined : variantById(toolVariants[tool.id])
         const ammo = variant && variant.ammoMax > 0 ? (variantAmmo[variant.id] ?? 0) : null
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         return (
           <button
             key={tool.id}
             type="button"
             onClick={() => setActiveTool(tool.id)}
+<<<<<<< HEAD
             title={`${variant?.name ?? tool.title} · Lv${state.level}${ammo !== null ? ` · 弹药 ${ammo}` : ''}`}
+=======
+            title={`${tool.title} · Lv${state.level}`}
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
             className={cn(
               'glass relative flex flex-col rounded-xl border transition-all active:translate-y-px',
               compact ? 'w-11 items-center gap-1 px-1.5 py-1.5' : 'w-[4.6rem] gap-1 px-2 py-2',
@@ -159,7 +186,11 @@ function ToolDock({ compact = false }: { compact?: boolean }) {
             </div>
             {!compact && (
               <span className={cn('text-[10px] font-medium', active ? 'text-foam' : 'text-foam/55')}>
+<<<<<<< HEAD
                 {variant?.name ?? tool.name}
+=======
+                {tool.name}
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
               </span>
             )}
             <Bar
@@ -172,6 +203,7 @@ function ToolDock({ compact = false }: { compact?: boolean }) {
                 {index + 1}
               </span>
             )}
+<<<<<<< HEAD
             {compact && ammo !== null && (
               <span
                 className="tnum absolute -right-1 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full px-0.5 text-[8px] font-bold text-abyss"
@@ -180,6 +212,8 @@ function ToolDock({ compact = false }: { compact?: boolean }) {
                 {ammo}
               </span>
             )}
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
             {compact && tool.id === 'trap' && trapCount > 0 && (
               <span className="tnum absolute -right-1 -top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-gold px-0.5 text-[8px] font-bold text-abyss">
                 {trapCount}
@@ -196,18 +230,27 @@ function CaptureReticle() {
   const target = useGameStore((s) => s.captureTarget)
   const activeTool = useGameStore((s) => s.activeTool)
   const tool = useGameStore((s) => s.tools[s.activeTool])
+<<<<<<< HEAD
   const toolVariants = useGameStore((s) => s.toolVariants)
   const variantAmmo = useGameStore((s) => s.variantAmmo)
   const bagCount = useGameStore((s) => s.bag.length)
   const capacity = useGameStore((s) => bagCapacity(s))
+=======
+  const bagCount = useGameStore((s) => s.bag.length)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const modal = useGameStore((s) => isModalOpen(s))
   const def = target?.defId ? fishById(target.defId) : undefined
   const meta = def ? RARITIES[def.rarity] : null
   const toolDef = CAPTURE_TOOLS.find((t) => t.id === activeTool)
+<<<<<<< HEAD
   const variant = activeTool === 'trap' ? undefined : variantById(toolVariants[activeTool])
   const stats = variantStats(toolStats(activeTool, tool.level), variant)
   const ammo = variant && variant.ammoMax > 0 ? (variantAmmo[variant.id] ?? 0) : null
   const color = meta?.color ?? variant?.color ?? toolDef?.color ?? '#6fe0cf'
+=======
+  const stats = toolStats(activeTool, tool.level)
+  const color = meta?.color ?? toolDef?.color ?? '#6fe0cf'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const locked = Boolean(target && (target.defId || activeTool === 'trap'))
 
   if (modal) return null
@@ -216,9 +259,13 @@ function CaptureReticle() {
     ? '对准鱼群'
     : tool.wear <= 0
       ? '工具损坏 · 回码头修理'
+<<<<<<< HEAD
       : ammo === 0
         ? '弹药耗尽 · 回渔具铺补给'
         : bagCount >= capacity
+=======
+      : bagCount >= BAG_CAPACITY
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         ? '鱼篓已满 · 回码头卸货'
         : def && target.distance > stats.range
           ? `再靠近 ${(target.distance - stats.range).toFixed(1)}m`
@@ -294,7 +341,11 @@ function CaptureReticle() {
                 ) : (
                   <Crosshair className="size-3" />
                 )}
+<<<<<<< HEAD
                 {variant?.name ?? toolDef.name}
+=======
+                {toolDef.name}
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
               </span>
             )}
           </div>
@@ -316,6 +367,7 @@ function CaptureReticle() {
   )
 }
 
+<<<<<<< HEAD
 function ChestPrompt() {
   const prompt = useGameStore((s) => s.chestPrompt)
   if (!prompt) return null
@@ -332,6 +384,8 @@ function ChestPrompt() {
   )
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 function TrapStatus() {
   const traps = useGameStore((s) => s.traps)
   const now = useNow(1000)
@@ -396,12 +450,16 @@ export function UnderwaterHud() {
   const activeTool = useGameStore((s) => s.activeTool)
   const tool = useGameStore((s) => s.tools[s.activeTool])
   const bagCount = useGameStore((s) => s.bag.length)
+<<<<<<< HEAD
   const capacity = useGameStore((s) => bagCapacity(s))
   const toolVariants = useGameStore((s) => s.toolVariants)
   const variantAmmo = useGameStore((s) => s.variantAmmo)
   const toolDef = CAPTURE_TOOLS.find((t) => t.id === activeTool)
   const variant = activeTool === 'trap' ? undefined : variantById(toolVariants[activeTool])
   const ammo = variant && variant.ammoMax > 0 ? (variantAmmo[variant.id] ?? 0) : null
+=======
+  const toolDef = CAPTURE_TOOLS.find((t) => t.id === activeTool)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const [sprint, setSprint] = useState(false)
 
   useEffect(() => {
@@ -433,7 +491,10 @@ export function UnderwaterHud() {
     <>
       <ObservedFish />
       <CaptureReticle />
+<<<<<<< HEAD
       <ChestPrompt />
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       <TrapStatus />
 
       {isTouch ? (
@@ -510,7 +571,11 @@ export function UnderwaterHud() {
               </button>
             </div>
             <div className="tnum text-[9.5px] tracking-[0.16em] text-foam/35">
+<<<<<<< HEAD
               深度 {depth.toFixed(1)}m · {variant?.name ?? toolDef?.name}磨损 {Math.round(tool.wear)}%
+=======
+              深度 {depth.toFixed(1)}m · {toolDef?.name}磨损 {Math.round(tool.wear)}%
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
             </div>
           </div>
         </div>
@@ -520,9 +585,13 @@ export function UnderwaterHud() {
             <div className="flex flex-col items-center gap-1.5">
               <ToolDock />
               <div className="tnum text-[9px] tracking-[0.18em] text-foam/30">
+<<<<<<< HEAD
                 {variant?.name ?? toolDef?.name}磨损 {Math.round(tool.wear)}% · 鱼篓 {bagCount}/
                 {capacity}
                 {ammo !== null && ` · 弹药 ${ammo}/${variant?.ammoMax}`}
+=======
+                {toolDef?.name}磨损 {Math.round(tool.wear)}% · 鱼篓 {bagCount}/{BAG_CAPACITY}
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
               </div>
             </div>
           </div>

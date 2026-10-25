@@ -1,5 +1,8 @@
 import { Keyboard } from 'lucide-react'
+<<<<<<< HEAD
 import { useGameStore } from '@/store/useGameStore'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 const HINTS = [
   { keys: ['W', 'A', 'S', 'D'], label: '划船' },
@@ -12,6 +15,7 @@ const HINTS = [
   { keys: ['R'], label: '鱼饵' },
   { keys: ['T'], label: '季节' },
   { keys: ['V'], label: '潜入水下' },
+<<<<<<< HEAD
   { keys: ['Z'], label: '挥刀' },
   { keys: ['X'], label: '鱼枪' },
   { keys: ['Y'], label: '抛锚' },
@@ -32,6 +36,11 @@ export function DesktopHints() {
       : hint,
   )
 
+=======
+]
+
+export function DesktopHints() {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   return (
     <div className="pointer-events-none absolute bottom-4 left-5 z-20 hidden sm:block">
       <div className="glass rounded-xl px-3 py-2.5">
@@ -40,7 +49,11 @@ export function DesktopHints() {
           操作
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+<<<<<<< HEAD
           {hints.map((h) => (
+=======
+          {HINTS.map((h) => (
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
             <div key={h.label} className="flex items-center gap-1.5">
               <div className="flex items-center gap-0.5">
                 {h.keys.map((k) => (

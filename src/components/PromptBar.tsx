@@ -7,9 +7,16 @@ export function PromptBar() {
   const prompt = useGameStore((s) => s.prompt)
   const phase = useGameStore((s) => s.phase)
   const modal = useGameStore((s) => isModalOpen(s) || s.underwater)
+<<<<<<< HEAD
   const isTouch = useIsTouch()
 
   const visible = Boolean(prompt) && phase === 'idle' && !modal
+=======
+  const nearDock = useGameStore((s) => s.nearDock)
+  const isTouch = useIsTouch()
+
+  const visible = Boolean(prompt) && phase === 'idle' && !modal && nearDock
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-28 z-20 flex justify-center px-4 sm:bottom-9">

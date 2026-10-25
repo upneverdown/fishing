@@ -8,6 +8,7 @@ import { SeasonFx } from '@/game/fx/seasonFx'
 import { UnderwaterWorld } from '@/game/underwater/underwaterWorld'
 import { UnderwaterPost } from '@/game/render/underwaterPost'
 import { input } from '@/game/input'
+<<<<<<< HEAD
 import { MAX_HP, bagCapacity, isModalOpen, useGameStore } from '@/store/useGameStore'
 import { gameEvents } from '@/game/eventBus'
 import { AchievementManager } from '@/game/achievements/achievementManager'
@@ -20,6 +21,9 @@ import {
   crewRepairsHull,
   crewSpeedMul,
 } from '@/game/crew/crew'
+=======
+import { BAG_CAPACITY, isModalOpen, useGameStore } from '@/store/useGameStore'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import {
   CAPTURE_TOOLS,
   toolById,
@@ -27,16 +31,20 @@ import {
   toolStats,
   trapOutcome,
 } from '@/game/capture/tools'
+<<<<<<< HEAD
 import { variantById, variantStats } from '@/game/capture/variants'
 import { CreatureSystem } from '@/game/creatures/creatureSystem'
 import { CAMPFIRE_RADIUS, DockLife } from '@/game/world/dockLife'
 import { weaponById } from '@/game/combat/weapons'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { dayKey } from '@/game/economy/market'
 import { audio } from '@/game/audio/gameAudio'
 import {
   DOCK_POINT,
   MAX_WATER_DEPTH,
   SELL_RADIUS,
+<<<<<<< HEAD
   SPAWN,
   WORLD_HALF,
   zoneAt,
@@ -51,6 +59,15 @@ import {
 } from '@/game/fishing/fishTable'
 import { clamp } from '@/game/utils/math'
 import type { Catch, SeasonId, UnderwaterMode } from '@/types'
+=======
+  WORLD_HALF,
+  zoneAt,
+} from '@/game/world/worldMap'
+import { SEASONS } from '@/game/world/seasons'
+import { fishById, createCatch, type FishDef } from '@/game/fishing/fishTable'
+import { clamp } from '@/game/utils/math'
+import type { SeasonId, UnderwaterMode } from '@/types'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer
@@ -63,6 +80,7 @@ export class Game {
   readonly leaves: FloatingLeaves
   readonly seasonFx: SeasonFx
   readonly underwaterWorld: UnderwaterWorld
+<<<<<<< HEAD
   readonly creatures: CreatureSystem
   readonly dockLife: DockLife
   readonly post: UnderwaterPost
@@ -70,6 +88,9 @@ export class Game {
   readonly crewSystem: CrewSystem
   readonly seaEvents: SeaEvents
   readonly treasures: TreasureSystem
+=======
+  readonly post: UnderwaterPost
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   private raf = 0
   private disposed = false
@@ -91,7 +112,10 @@ export class Game {
   private viewDir = new THREE.Vector3()
 
   private swimPos = new THREE.Vector3()
+<<<<<<< HEAD
   private swimVel = new THREE.Vector3()
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   private swimYaw = 0
   private swimPitch = 0
   private followYaw = 0
@@ -113,6 +137,7 @@ export class Game {
   private sunWorld = new THREE.Vector3()
   private sunUv = new THREE.Vector2(0.5, 0.9)
   private bufferSize = new THREE.Vector2()
+<<<<<<< HEAD
   private navTimer = 0
   private combatTarget = new THREE.Vector3()
   private bubblePool = new THREE.Points(
@@ -166,6 +191,8 @@ export class Game {
   private lastRespawnToken = 0
   private boatSafe = new THREE.Vector3()
   private lastLockedWater: string | null = null
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   private lastPrompt: string | null = null
   private lastNearDock = false
@@ -197,6 +224,7 @@ export class Game {
     this.leaves = new FloatingLeaves(this.scene, this.world)
     this.seasonFx = new SeasonFx(this.scene)
     this.underwaterWorld = new UnderwaterWorld(this.scene, this.world)
+<<<<<<< HEAD
     this.creatures = new CreatureSystem(this.scene, this.world)
     this.dockLife = new DockLife(this.scene)
     this.crewSystem = new CrewSystem(this.boat)
@@ -211,6 +239,10 @@ export class Game {
     this.buildTrawlNet()
     this.buildBubbleTrail()
 
+=======
+    this.post = new UnderwaterPost()
+
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     useGameStore.setState({
       phase: 'idle',
       power: 0,
@@ -236,6 +268,7 @@ export class Game {
     window.addEventListener('resize', this.handleResize)
     this.canvas.addEventListener('contextmenu', this.preventContext)
 
+<<<<<<< HEAD
     const saved = useGameStore.getState()
     if (saved.boatPose && this.world.depthAt(saved.boatPose.x, saved.boatPose.z) > 0.9) {
       this.boat.position.x = saved.boatPose.x
@@ -246,10 +279,13 @@ export class Game {
     this.lastRespawnToken = saved.respawnToken
     this.lastWeaponId = saved.equippedWeapon
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.boat.update(0, 0, this.world, 0, 0, false)
     this.syncCosmetics(useGameStore.getState())
     this.syncSeason(useGameStore.getState(), true)
     this.updateCamera(1, true)
+<<<<<<< HEAD
     this.updateWeapon(0, saved, false, false)
   }
 
@@ -511,6 +547,8 @@ export class Game {
     attr.needsUpdate = true
     ;(this.bubblePool.material as THREE.PointsMaterial).opacity =
       0.34 + Math.min(0.3, this.oxygenValue < 30 ? 0.25 : 0.1)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private syncCosmetics(store: ReturnType<typeof useGameStore.getState>) {
@@ -601,11 +639,17 @@ export class Game {
 
   private update(dt: number, time: number) {
     const store = useGameStore.getState()
+<<<<<<< HEAD
     this.boat.crewSpeedMul = crewSpeedMul(store.crew)
     this.syncCosmetics(store)
     this.syncSeason(store)
     this.renderer.toneMappingExposure =
       this.world.exposure * (1 - this.world.stormStrength * 0.42)
+=======
+    this.syncCosmetics(store)
+    this.syncSeason(store)
+    this.renderer.toneMappingExposure = this.world.exposure
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (store.underwater !== this.lastUnderwater) {
       if (store.underwater) this.enterUnderwater()
@@ -620,12 +664,16 @@ export class Game {
       this.world.updateFoam(dt)
       this.leaves.update(time, dt, this.boat.position)
       this.seasonFx.update(time, dt, this.boat.position)
+<<<<<<< HEAD
       this.crewSystem.update(dt, time)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       this.updateCamera(dt, false)
       return
     }
 
     const modal = isModalOpen(store)
+<<<<<<< HEAD
     const locked = store.inputLocked
     if (locked && !this.creatures.introActive) store.setInputLocked(false)
 
@@ -636,6 +684,11 @@ export class Game {
       this.lastRespawnToken = store.respawnToken
       this.resetToDock()
     }
+=======
+
+    input.update()
+    if (modal) input.clearQueued()
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (store.underwater) {
       this.updateUnderwater(dt, time, store, modal)
@@ -644,13 +697,18 @@ export class Game {
 
     const fishingPhase = this.fishing.phase
     const fishingBusy = fishingPhase !== 'idle' && fishingPhase !== 'charging'
+<<<<<<< HEAD
     const anchored =
       store.installedFacilities.includes('anchor') && Boolean(store.facilityActive.anchor)
     const allowMove = !modal && !locked && !fishingBusy && !anchored
+=======
+    const allowMove = !modal && !fishingBusy
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     let throttle = input.throttle
     let steer = input.steer
     if (!allowMove) throttle = 0
+<<<<<<< HEAD
     if (modal || locked || fishingBusy || anchored) steer = 0
 
     this.boatSafe.copy(this.boat.position)
@@ -716,6 +774,11 @@ export class Game {
     }
     this.waterWarnT = Math.max(0, this.waterWarnT - dt)
 
+=======
+    if (modal || fishingBusy) steer = 0
+
+    this.boat.update(dt, time, this.world, throttle, steer, allowMove)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.world.water.setContact(
       0,
       this.boat.position.x,
@@ -724,6 +787,7 @@ export class Game {
       0.26 + Math.min(0.22, this.boat.speed * 0.035),
     )
     this.fishing.update(dt, time)
+<<<<<<< HEAD
     this.otter.update(
       dt,
       time,
@@ -748,11 +812,17 @@ export class Game {
     this.world.updateFoam(dt)
     this.underwaterWorld.updateAmbient(time, dt, this.boat.position)
     this.dockLife.update(time, dt, this.boat.position)
+=======
+    this.otter.update(dt, time, false, this.boat.position, this.boat.position, store.pet.affection)
+    this.world.update(time, dt, this.boat.position)
+    this.world.updateFoam(dt)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.leaves.update(time, dt, this.boat.position)
     this.seasonFx.update(time, dt, this.boat.position)
     this.seasonFx.setVisible(true)
 
     this.wakeTimer -= dt
+<<<<<<< HEAD
     if (!modal && !locked && allowMove && this.boat.speed > 1.5 && this.wakeTimer <= 0) {
       this.boat.getStern(this.stern)
       this.world.foam.wake(this.stern.x, this.stern.z, 0.7 + this.boat.speed * 0.12)
@@ -772,6 +842,11 @@ export class Game {
           0.45 + this.boat.speed * 0.08,
         )
       }
+=======
+    if (!modal && allowMove && this.boat.speed > 1.5 && this.wakeTimer <= 0) {
+      this.boat.getStern(this.stern)
+      this.world.foam.wake(this.stern.x, this.stern.z, 0.7 + this.boat.speed * 0.12)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       this.wakeTimer = 0.09
     }
 
@@ -782,6 +857,7 @@ export class Game {
       this.rippleTimer = 0.48
     }
 
+<<<<<<< HEAD
     this.updateWeapon(dt, store, modal, fishingBusy)
     this.updateSearchlight(store)
     this.updateTrawl(dt, store, time)
@@ -795,16 +871,26 @@ export class Game {
       this.handleActions(store, modal)
       this.handleCombat(store, modal)
     }
+=======
+    this.updateCamera(dt, false)
+    this.updateStatus(dt, modal, false)
+    this.handleActions(store, modal)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private enterUnderwater() {
     this.lastUnderwater = true
     this.oxygenValue = 100
+<<<<<<< HEAD
     this.swimVel.set(0, 0, 0)
     input.clear()
     input.setLookEnabled(true)
     useGameStore.getState().setCombatCamera(false)
     gameEvents.emit('underwater:enter', { at: Date.now() })
+=======
+    input.clear()
+    input.setLookEnabled(true)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     const fwd = this.boat.getForward(this.forward)
     this.swimYaw = Math.atan2(fwd.x, fwd.z)
@@ -842,7 +928,10 @@ export class Game {
     this.leaves.setVisible(true)
     this.oxygenValue = 100
     useGameStore.getState().setCaptureTarget(null)
+<<<<<<< HEAD
     this.treasures.clearPrompt()
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.camPos.copy(this.camera.position)
     this.camera.getWorldDirection(this.viewDir)
     this.camLook.copy(this.camera.position).addScaledVector(this.viewDir, 6)
@@ -854,11 +943,15 @@ export class Game {
     store: ReturnType<typeof useGameStore.getState>,
     modal: boolean,
   ) {
+<<<<<<< HEAD
     const locked = store.inputLocked
     this.boat.update(dt, time, this.world, 0, 0, false)
     this.boat.setNight(
       SEASONS[store.season].period === 'night' || this.world.stormStrength > 0.45,
     )
+=======
+    this.boat.update(dt, time, this.world, 0, 0, false)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.world.water.setContact(
       0,
       this.boat.position.x,
@@ -868,6 +961,7 @@ export class Game {
     )
     this.world.updateFoam(dt)
     this.underwaterWorld.update(time, dt, this.swimPos)
+<<<<<<< HEAD
     this.updateBubbles(dt, true)
     this.otter.update(
       dt,
@@ -878,10 +972,14 @@ export class Game {
       store.pet.affection,
       this.swimYaw + Math.PI,
     )
+=======
+    this.otter.update(dt, time, true, this.boat.position, this.swimPos, store.pet.affection)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.captureCooldown = Math.max(0, this.captureCooldown - dt)
     this.trapClock += dt
     this.syncTraps(store)
     this.collectNearbyTraps(store)
+<<<<<<< HEAD
     this.treasures.updateUnderwater(dt, time, this.swimPos, store)
     this.seasonFx.setVisible(false)
     this.leaves.setVisible(false)
@@ -902,12 +1000,21 @@ export class Game {
     }
     this.crewSystem.update(dt, time)
 
+=======
+    this.seasonFx.setVisible(false)
+    this.leaves.setVisible(false)
+
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     const mode = store.underwaterMode
     const look = input.consumeLook()
     if (mode === 'dive') {
       this.swimYaw += look.dx * 0.0032
       this.swimPitch = clamp(this.swimPitch - look.dy * 0.0032, -1.15, 1.15)
+<<<<<<< HEAD
       this.moveDiver(dt, modal || locked)
+=======
+      this.moveDiver(dt, modal)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       this.camera.position.lerp(this.swimPos, 1 - Math.exp(-dt * 14))
       this.camera.position.y += Math.sin(time * 1.15) * 0.035
       this.lookTarget
@@ -937,6 +1044,7 @@ export class Game {
     this.world.update(time, dt, this.camera.position)
     this.updateUnderwaterFov(dt, mode)
 
+<<<<<<< HEAD
     if (!modal) {
       this.creatures.update(dt, time, {
         position: this.swimPos,
@@ -949,6 +1057,8 @@ export class Game {
     this.updateTrawl(dt, store, time)
     this.updateRadar(dt, store)
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.hudTimer -= dt
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.12
@@ -957,9 +1067,13 @@ export class Game {
     }
 
     if (!modal) {
+<<<<<<< HEAD
       const drain =
         (mode === 'dive' ? (input.sprint ? 3.1 : 1.55) : mode === 'follow' ? 1.05 : 0.9) *
         crewOxygenMul(store.crew)
+=======
+      const drain = mode === 'dive' ? (input.sprint ? 3.1 : 1.55) : mode === 'follow' ? 1.05 : 0.9
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       this.oxygenValue = Math.max(0, this.oxygenValue - drain * dt)
       store.setOxygen(this.oxygenValue)
       if (this.oxygenValue <= 0) {
@@ -970,11 +1084,15 @@ export class Game {
     }
 
     this.updateStatus(dt, modal, true)
+<<<<<<< HEAD
     this.updateNav(dt, store)
     if (!locked) {
       this.handleUnderwaterActions(store, modal)
       this.handleCombat(store, modal)
     }
+=======
+    this.handleUnderwaterActions(store, modal)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private moveDiver(dt: number, modal: boolean) {
@@ -983,6 +1101,7 @@ export class Game {
     const vertical = modal ? 0 : input.vertical
     const moving = Math.abs(throttle) + Math.abs(steer) + Math.abs(vertical) > 0.01
     const sprint = input.sprint && moving
+<<<<<<< HEAD
     const speed = sprint ? 8.6 : 4.8
     const cosPitch = Math.cos(this.swimPitch)
     const sinPitch = Math.sin(this.swimPitch)
@@ -1009,11 +1128,27 @@ export class Game {
     } else {
       this.swimVel.x *= 0.2
       this.swimVel.z *= 0.2
+=======
+    const speed = sprint ? 8.4 : 4.6
+
+    const sin = Math.sin(this.swimYaw)
+    const cos = Math.cos(this.swimYaw)
+    const dx = (sin * throttle + cos * steer) * speed * dt
+    const dz = (cos * throttle - sin * steer) * speed * dt
+    const nextX = clamp(this.swimPos.x + dx, -WORLD_HALF + 5, WORLD_HALF - 5)
+    const nextZ = clamp(this.swimPos.z + dz, -WORLD_HALF + 5, WORLD_HALF - 5)
+
+    const depthHere = this.world.depthAt(nextX, nextZ)
+    if (depthHere > 0.55) {
+      this.swimPos.x = nextX
+      this.swimPos.z = nextZ
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     }
 
     const floor = this.world.depthAt(this.swimPos.x, this.swimPos.z)
     const surface = Math.min(-0.45, this.world.waveHeight(this.swimPos.x, this.swimPos.z, this.elapsed) - 0.4)
     const bottom = -Math.max(0.9, floor - 0.8)
+<<<<<<< HEAD
     this.swimPos.y += this.swimVel.y * dt
     if (this.swimPos.y <= bottom) {
       this.swimPos.y = bottom
@@ -1024,6 +1159,9 @@ export class Game {
     }
     // Gentle drag keeps the floaty buoyancy from building up speed.
     this.swimVel.multiplyScalar(Math.exp(-dt * 0.6))
+=======
+    this.swimPos.y = clamp(this.swimPos.y + vertical * (sprint ? 4.6 : 2.8) * dt, bottom, surface)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private nearestFish() {
@@ -1091,13 +1229,17 @@ export class Game {
   }
 
   private updateCamera(dt: number, immediate: boolean) {
+<<<<<<< HEAD
     const store = useGameStore.getState()
     if (store.combatCamera && !store.boss) store.setCombatCamera(false)
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     const forward = this.boat.getForward(this.forward)
     const back = this.back.copy(forward).negate()
     const right = this.right.set(-forward.z, 0, forward.x)
     const portrait = this.camera.aspect < 0.85
+<<<<<<< HEAD
     let targetFov = portrait ? 58 : 48
 
     if (this.creatures.introActive && !store.underwater) {
@@ -1134,6 +1276,17 @@ export class Game {
     } else {
       this.chaseTarget(portrait)
     }
+=======
+
+    this.desired.copy(this.boat.position).addScaledVector(back, 9.8).addScaledVector(right, 4.2)
+    this.desired.y = this.boat.position.y + (portrait ? 6.6 : 5.7)
+
+    this.lookTarget
+      .copy(this.boat.position)
+      .addScaledVector(forward, 2.6)
+      .addScaledVector(right, 0.7)
+    this.lookTarget.y += 0.95
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (immediate) {
       this.camPos.copy(this.desired)
@@ -1146,12 +1299,18 @@ export class Game {
     this.camera.position.copy(this.camPos)
     this.camera.lookAt(this.camLook)
 
+<<<<<<< HEAD
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
+=======
+    const targetFov = portrait ? 58 : 48
+    if (!this.lastUnderwater && Math.abs(this.camera.fov - targetFov) > 0.01) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       this.camera.fov = THREE.MathUtils.damp(this.camera.fov, targetFov, 4, dt)
       this.camera.updateProjectionMatrix()
     }
   }
 
+<<<<<<< HEAD
   private chaseTarget(portrait: boolean) {
     const forward = this.boat.getForward(this.forward)
     const right = this.right.set(-forward.z, 0, forward.x)
@@ -1218,6 +1377,8 @@ export class Game {
     return null
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   private updateStatus(dt: number, modal: boolean, underwater: boolean) {
     this.statusTimer -= dt
     if (this.statusTimer > 0) return
@@ -1230,18 +1391,47 @@ export class Game {
       store.setZone(zone)
     }
 
+<<<<<<< HEAD
     const info = modal ? null : this.resolveInteract(store)
     const prompt = info?.prompt ?? null
     const label = info?.label ?? null
     const nearDock = info?.kind === 'market' && store.bag.length > 0
+=======
+    const distance = Math.hypot(
+      this.boat.position.x - DOCK_POINT.x,
+      this.boat.position.z - DOCK_POINT.z,
+    )
+    const canTrade =
+      !underwater &&
+      distance < SELL_RADIUS &&
+      this.fishing.phase === 'idle' &&
+      !modal
+
+    const nearDock = canTrade && store.bag.length > 0
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (nearDock !== this.lastNearDock) {
       this.lastNearDock = nearDock
       store.setNearDock(nearDock)
     }
+<<<<<<< HEAD
+=======
+
+    let prompt: string | null = null
+    if (canTrade) {
+      if (store.bag.length === 0) {
+        prompt = '鱼篓还是空的，划出去试试手气'
+      } else {
+        const total = store.bag.reduce((sum, c) => sum + c.value, 0)
+        prompt = `出售 ${store.bag.length} 条渔获 · ¥${total}`
+      }
+    }
+
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (prompt !== this.lastPrompt) {
       this.lastPrompt = prompt
       store.setPrompt(prompt)
     }
+<<<<<<< HEAD
     if (label !== store.interactLabel) store.setInteractLabel(label)
   }
 
@@ -1706,6 +1896,8 @@ export class Game {
     attr.needsUpdate = true
     const material = this.rope.material as THREE.LineBasicMaterial
     material.opacity = 0.9 * Math.min(1, this.ropeT / 0.2)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private handleActions(store: ReturnType<typeof useGameStore.getState>, modal: boolean) {
@@ -1741,9 +1933,13 @@ export class Game {
     }
 
     if (input.consumeDive()) {
+<<<<<<< HEAD
       if (store.boss) {
         store.toggleCombatCamera()
       } else if (this.fishing.phase === 'idle') {
+=======
+      if (this.fishing.phase === 'idle') {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         store.setUnderwater(true)
       } else {
         store.toast('先收线，再潜下水', 'info')
@@ -1766,6 +1962,7 @@ export class Game {
       }
     }
 
+<<<<<<< HEAD
     if (input.consumeAchievements()) {
       store.toggleAchievements()
     }
@@ -1774,11 +1971,14 @@ export class Game {
       store.setCrewOpen(true)
     }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (input.consumeTool() && this.fishing.phase === 'waiting') {
       this.fishing.twitch()
     }
 
     if (input.consumeInteract()) {
+<<<<<<< HEAD
       const info = this.resolveInteract(store)
       if (!info) return
       if (info.kind === 'seaevent') {
@@ -1808,6 +2008,20 @@ export class Game {
       if (info.kind === 'market') {
         if (store.bag.length > 0) store.openMarket()
         else store.toast('鱼篓是空的，先去钓几条鱼吧')
+=======
+      const distance = Math.hypot(
+        this.boat.position.x - DOCK_POINT.x,
+        this.boat.position.z - DOCK_POINT.z,
+      )
+      if (
+        distance < SELL_RADIUS &&
+        this.fishing.phase === 'idle' &&
+        store.bag.length > 0
+      ) {
+        store.openMarket()
+      } else if (distance < SELL_RADIUS && store.bag.length === 0) {
+        store.toast('鱼篓是空的，先去钓几条鱼吧')
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       }
     }
   }
@@ -1833,7 +2047,11 @@ export class Game {
       return
     }
     if (input.consumeTool()) {
+<<<<<<< HEAD
       if (!this.treasures.tryOpenChest(this.swimPos, store)) store.cycleUnderwaterMode()
+=======
+      store.cycleUnderwaterMode()
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     }
     if (input.consumeBait()) {
       store.setBaitOpen(true)
@@ -1842,6 +2060,7 @@ export class Game {
       store.setSeasonOpen(true)
     }
 
+<<<<<<< HEAD
     if (input.consumeAchievements()) {
       store.toggleAchievements()
     }
@@ -1850,6 +2069,8 @@ export class Game {
       store.setCrewOpen(true)
     }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (input.consumeInteract()) {
       this.fireCapture(store)
       return
@@ -1902,6 +2123,7 @@ export class Game {
   private updateCaptureAim(store: ReturnType<typeof useGameStore.getState>) {
     const tool = store.activeTool
     const state = store.tools[tool]
+<<<<<<< HEAD
     const variant =
       tool === 'harpoon' || tool === 'net'
         ? variantById(store.toolVariants[tool])
@@ -1913,6 +2135,12 @@ export class Game {
     const ammoOk =
       !variant || variant.ammoMax === 0 || (store.variantAmmo[variant.id] ?? 0) > 0
     const capacity = bagCapacity(store)
+=======
+    const stats = toolStats(tool, state.level)
+    const fish = this.findAimFish(stats.range)
+    this.captureFish = fish
+    const wearOk = state.wear > 0
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (tool === 'trap') {
       store.setCaptureTarget({
         label: wearOk ? '布设鱼笼' : '鱼笼已损坏',
@@ -1922,6 +2150,7 @@ export class Game {
       return
     }
     if (!fish) {
+<<<<<<< HEAD
       store.setCaptureTarget(
         variant && variant.damage >= 20
           ? {
@@ -1931,6 +2160,9 @@ export class Game {
             }
           : null,
       )
+=======
+      store.setCaptureTarget(null)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       return
     }
     store.setCaptureTarget({
@@ -1939,10 +2171,16 @@ export class Game {
       distance: fish.distance,
       ready:
         wearOk &&
+<<<<<<< HEAD
         ammoOk &&
         this.captureCooldown <= 0 &&
         fish.distance <= stats.range &&
         store.bag.length < capacity,
+=======
+        this.captureCooldown <= 0 &&
+        fish.distance <= stats.range &&
+        store.bag.length < BAG_CAPACITY,
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     })
   }
 
@@ -1950,19 +2188,27 @@ export class Game {
     const tool = store.activeTool
     const def = toolById(tool)
     const state = store.tools[tool]
+<<<<<<< HEAD
     const variant =
       tool === 'harpoon' || tool === 'net'
         ? variantById(store.toolVariants[tool])
         : undefined
     const stats = variantStats(toolStats(tool, state.level), variant)
+=======
+    const stats = toolStats(tool, state.level)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (!def) return
     if (state.wear <= 0) {
       store.toast(`${def.name}已经损坏，回码头找阿岚修理`, 'danger')
       return
     }
     if (this.captureCooldown > 0) return
+<<<<<<< HEAD
     const capacity = bagCapacity(store)
     if (store.bag.length >= capacity) {
+=======
+    if (store.bag.length >= BAG_CAPACITY) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       store.toast('鱼篓满了，先回码头卸货', 'danger')
       return
     }
@@ -1995,6 +2241,7 @@ export class Game {
 
     const fish = this.findAimFish(stats.range)
     if (!fish) {
+<<<<<<< HEAD
       if (variant && variant.damage >= 20) {
         if (variant.ammoMax > 0 && !store.consumeVariantAmmo(variant.id)) return
         this.camera.getWorldDirection(this.viewDir)
@@ -2019,11 +2266,17 @@ export class Game {
       return
     }
     if (variant && variant.ammoMax > 0 && !store.consumeVariantAmmo(variant.id)) return
+=======
+      store.toast('准星里没有鱼，再游近一点', 'info')
+      return
+    }
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.captureCooldown = stats.cooldown
     store.wearTool(tool, stats.wear)
 
     if (tool === 'harpoon') {
       const depth = this.world.depthAt(fish.group.position.x, fish.group.position.z)
+<<<<<<< HEAD
       let chance = toolCaptureChance('harpoon', fish.def, state.level, depth)
       if (variant?.drag) chance = Math.min(0.98, chance + 0.16)
       if (variant && variant.damage >= 20) {
@@ -2036,6 +2289,11 @@ export class Game {
       }
       if (Math.random() <= chance) {
         const caught = this.scaleCatch(createCatch(fish.def, 'harpoon'), variant?.valueMul ?? 1)
+=======
+      const chance = toolCaptureChance('harpoon', fish.def, state.level, depth)
+      if (Math.random() <= chance) {
+        const caught = createCatch(fish.def, 'harpoon')
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         const added = store.addCatch(caught, 'harpoon')
         if (added) {
           this.underwaterWorld.removeFish(fish.group)
@@ -2060,12 +2318,16 @@ export class Game {
       }))
       .filter((f) => f.d <= stats.radius)
       .sort((a, b) => a.d - b.d)
+<<<<<<< HEAD
     if (variant && variant.damage >= 20) {
       this.creatures.aoeHit(center, stats.radius, variant.damage, variant.id === 'abyssNet' ? 3 : 0)
       this.world.foam.ripple(center.x, center.z, stats.radius * 0.8)
       this.flashMuzzle(center)
     }
     const slots = Math.max(0, bagCapacity(store) - store.bag.length)
+=======
+    const slots = Math.max(0, BAG_CAPACITY - store.bag.length)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     const limit = Math.min(stats.capacity, slots)
     const capturedList: ReturnType<typeof createCatch>[] = []
     for (const target of targets) {
@@ -2076,7 +2338,11 @@ export class Game {
         this.underwaterWorld.startleFish(target.group)
         continue
       }
+<<<<<<< HEAD
       const caught = this.scaleCatch(createCatch(target.def, 'net'), variant?.valueMul ?? 1)
+=======
+      const caught = createCatch(target.def, 'net')
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       const added = useGameStore.getState().addCatch(caught, 'net')
       if (!added) continue
       this.underwaterWorld.removeFish(target.group)
@@ -2193,6 +2459,7 @@ export class Game {
       })
     }
     this.trapMeshes.clear()
+<<<<<<< HEAD
     this.rope.geometry.dispose()
     ;(this.rope.material as THREE.Material).dispose()
     this.creatures.dispose()
@@ -2201,6 +2468,8 @@ export class Game {
     this.seaEvents.dispose()
     this.treasures.dispose()
     this.achievements.dispose()
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.post.dispose()
     this.seasonFx.dispose()
     this.underwaterWorld.dispose()

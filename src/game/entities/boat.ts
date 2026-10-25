@@ -78,6 +78,7 @@ const brassMat = new THREE.MeshStandardMaterial({
   metalness: 0.55,
   flatShading: true,
 })
+<<<<<<< HEAD
 const iceHullMat = new THREE.MeshStandardMaterial({
   color: '#31434c',
   roughness: 0.62,
@@ -95,6 +96,8 @@ const iceAccentMat = new THREE.MeshStandardMaterial({
   metalness: 0.15,
   flatShading: true,
 })
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 const goldMat = new THREE.MeshStandardMaterial({
   color: '#d6a84a',
   roughness: 0.35,
@@ -114,6 +117,7 @@ const bulbMat = new THREE.MeshStandardMaterial({
   emissiveIntensity: 1.6,
   roughness: 0.4,
 })
+<<<<<<< HEAD
 const pirateHullMat = new THREE.MeshStandardMaterial({
   color: '#181a1f',
   roughness: 0.58,
@@ -163,6 +167,8 @@ function tatteredSail(width: number, height: number) {
   shape.closePath()
   return new THREE.ShapeGeometry(shape)
 }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 function limb(from: THREE.Vector3, to: THREE.Vector3, radius: number, material: THREE.Material) {
   const dir = to.clone().sub(from)
@@ -240,6 +246,7 @@ const LAYOUTS: Record<BoatSkinId, BoatLayout> = {
     garland: { x: 0.62, y: 1.35, zFrom: -0.5, zTo: 0.85 },
     shadow: [2.2, 5.2],
   },
+<<<<<<< HEAD
   icebreaker: {
     angler: [0, 0.2, 1.9],
     rod: [0.46, 1.08, 2.1],
@@ -264,6 +271,8 @@ const LAYOUTS: Record<BoatSkinId, BoatLayout> = {
     garland: { x: 1.22, y: 0.98, zFrom: -2.35, zTo: 2.55 },
     shadow: [4.0, 8.0],
   },
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 export class Boat {
@@ -271,6 +280,7 @@ export class Boat {
   speed = 0
   heading = SPAWN.heading
   rodLoad = 0
+<<<<<<< HEAD
   crewSpeedMul = 1
   stormSpeedMul = 1
 
@@ -280,6 +290,8 @@ export class Boat {
     halfLength: number
     crewZ: [number, number]
   } = { y: 0.14, halfWidth: 0.4, halfLength: 0.95, crewZ: [-1.35, -0.2] }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   private hullGroup = new THREE.Group()
   private oarLeft: THREE.Group | null = null
@@ -307,6 +319,7 @@ export class Boat {
   private layout = LAYOUTS.rowboat
   private speedMul = 1
   private turnMul = 1
+<<<<<<< HEAD
   private bobMul = 1
   private accelMul = 1
   private camScale = 1
@@ -317,6 +330,9 @@ export class Boat {
   private pirateLanternLight: THREE.PointLight | null = null
   private pirateLanternGlow: THREE.MeshStandardMaterial | null = null
   private pirateSails: THREE.Mesh[] = []
+=======
+  private builtSkin: BoatSkinId | null = null
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   constructor(scene: THREE.Scene) {
     this.group.add(this.hullGroup)
@@ -345,6 +361,7 @@ export class Boat {
     this.layout = LAYOUTS[style.id]
     this.speedMul = style.speed
     this.turnMul = style.turn
+<<<<<<< HEAD
     const feel = {
       rowboat: { bob: 1.35, accel: 0.82 },
       speedboat: { bob: 1.0, accel: 1.22 },
@@ -366,6 +383,8 @@ export class Boat {
       icebreaker: { y: 0.7, halfWidth: 0.78, halfLength: 1.85, crewZ: [-1.4, 1.4] as [number, number] },
       pirate: { y: 0.78, halfWidth: 0.92, halfLength: 2.2, crewZ: [-1.75, 1.75] as [number, number] },
     }[style.id]
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (this.builtSkin !== style.id) {
       this.rebuildHull(style.id)
@@ -403,13 +422,17 @@ export class Boat {
     }
     this.oarLeft = null
     this.oarRight = null
+<<<<<<< HEAD
     this.pirateLanternLight = null
     this.pirateLanternGlow = null
     this.pirateSails = []
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (id === 'rowboat') this.buildRowboat()
     else if (id === 'speedboat') this.buildSpeedboat()
     else if (id === 'patrol') this.buildPatrolBoat()
+<<<<<<< HEAD
     else if (id === 'icebreaker') this.buildIcebreaker()
     else if (id === 'submarine') this.buildSubmarine()
     else this.buildPirateShip()
@@ -614,6 +637,9 @@ export class Boat {
 
   get cameraScale() {
     return this.camScale
+=======
+    else this.buildSubmarine()
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private applyLayout() {
@@ -1007,6 +1033,7 @@ export class Boat {
     this.hullGroup.add(fin)
   }
 
+<<<<<<< HEAD
   private buildIcebreaker() {
     const shape = new THREE.Shape()
     shape.moveTo(0, 3.25)
@@ -1093,6 +1120,8 @@ export class Boat {
     }
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   private buildRod() {
     this.rodPivot.position.set(0.46, 0.86, -0.28)
     this.rodPivot.rotation.x = -0.95
@@ -1374,10 +1403,13 @@ export class Boat {
     return this.group.position
   }
 
+<<<<<<< HEAD
   get deck() {
     return this.crewDeck
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   getForward(out = new THREE.Vector3()) {
     return out.set(-Math.sin(this.heading), 0, -Math.cos(this.heading))
   }
@@ -1392,6 +1424,7 @@ export class Boat {
     return this.rodTipObject.getWorldPosition(out)
   }
 
+<<<<<<< HEAD
   private canOccupy(x: number, z: number, world: World) {
     if (world.depthAt(x, z) <= 0.9) return false
     if (this.hullHalfLength <= 0) return true
@@ -1411,6 +1444,8 @@ export class Boat {
     return true
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   update(
     dt: number,
     time: number,
@@ -1421,6 +1456,7 @@ export class Boat {
   ) {
     const canDrive = allowMove
     if (canDrive) {
+<<<<<<< HEAD
       const speedBoost = this.crewSpeedMul * this.stormSpeedMul
       this.speed += throttle * 7.2 * this.speedMul * this.accelMul * speedBoost * dt
       this.speed *= Math.exp(-(Math.abs(throttle) < 0.05 ? 1.15 : 0.45) * dt)
@@ -1430,12 +1466,22 @@ export class Boat {
       const direction = this.speed < -0.15 ? -1 : 1
       // Screen-right steering must rotate toward +X when the chase camera sits behind the boat.
       this.heading -= steer * 1.45 * this.turnMul * dt * speedFactor * direction
+=======
+      this.speed += throttle * 7.2 * this.speedMul * dt
+      this.speed *= Math.exp(-(Math.abs(throttle) < 0.05 ? 1.15 : 0.45) * dt)
+      this.speed = clamp(this.speed, -2.7, 7.4 * this.speedMul)
+
+      const speedFactor = 0.34 + Math.min(Math.abs(this.speed) / (6.2 * this.speedMul), 1) * 0.9
+      const direction = this.speed < -0.15 ? -1 : 1
+      this.heading += steer * 1.45 * this.turnMul * dt * speedFactor * direction
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
       const forward = this.getForward()
       const step = this.speed * dt
       const nextX = this.position.x + forward.x * step
       const nextZ = this.position.z + forward.z * step
 
+<<<<<<< HEAD
       if (this.canOccupy(nextX, nextZ, world)) {
         this.position.x = nextX
         this.position.z = nextZ
@@ -1443,6 +1489,15 @@ export class Boat {
         this.position.x += forward.x * step
         this.speed *= 0.55
       } else if (this.canOccupy(this.position.x, this.position.z + forward.z * step, world)) {
+=======
+      if (world.depthAt(nextX, nextZ) > 0.9) {
+        this.position.x = nextX
+        this.position.z = nextZ
+      } else if (world.depthAt(this.position.x + forward.x * step, this.position.z) > 0.9) {
+        this.position.x += forward.x * step
+        this.speed *= 0.55
+      } else if (world.depthAt(this.position.x, this.position.z + forward.z * step) > 0.9) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         this.position.z += forward.z * step
         this.speed *= 0.55
       } else {
@@ -1453,6 +1508,7 @@ export class Boat {
     }
 
     const wave = world.waveHeight(this.position.x, this.position.z, time)
+<<<<<<< HEAD
     const bob = Math.sin(time * 1.15 + this.bobPhase)
     this.group.position.y = wave + 0.04 + bob * 0.032 * this.bobMul
     this.group.rotation.y = this.heading
@@ -1460,6 +1516,13 @@ export class Boat {
       -steer * 0.07 + Math.sin(time * 1.35 + this.bobPhase) * 0.022 * this.bobMul
     this.group.rotation.x =
       bob * 0.018 * this.bobMul + clamp(this.speed * 0.006, -0.03, 0.04)
+=======
+    this.group.position.y = wave + 0.04
+    const bob = Math.sin(time * 1.15 + this.bobPhase)
+    this.group.rotation.y = this.heading
+    this.group.rotation.z = -steer * 0.07 + Math.sin(time * 1.35 + this.bobPhase) * 0.022
+    this.group.rotation.x = bob * 0.018 + clamp(this.speed * 0.006, -0.03, 0.04)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     if (this.oarLeft && this.oarRight) {
       const rowing = Math.abs(throttle) > 0.08 ? 1 : Math.min(Math.abs(this.speed) / 4, 0.35)
@@ -1473,6 +1536,7 @@ export class Boat {
     this.rodPivot.rotation.x = -0.55 + chargeLean - this.rodLoad * 0.38
     this.rodPivot.rotation.z = -0.12 + this.rodLoad * 0.08
 
+<<<<<<< HEAD
     for (let i = 0; i < this.pirateSails.length; i++) {
       const sail = this.pirateSails[i]
       const buff = Math.min(1, Math.abs(this.speed) / 6)
@@ -1482,6 +1546,8 @@ export class Boat {
       sail.position.x = Math.sin(time * 1.6 + i * 2.1) * 0.02 * (0.4 + buff)
     }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.group.updateMatrixWorld(true)
   }
 }

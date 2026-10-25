@@ -1,13 +1,18 @@
 import { create } from 'zustand'
 import type {
+<<<<<<< HEAD
   AchievementToast,
   BaitId,
   BoatPose,
   BossHud,
+=======
+  BaitId,
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   CaptureTargetInfo,
   CaptureToolId,
   Catch,
   CatchMethod,
+<<<<<<< HEAD
   FacilityId,
   FishingPhase,
   FightState,
@@ -17,18 +22,31 @@ import type {
   RadarContact,
   Rarity,
   SeaEventHud,
+=======
+  FishingPhase,
+  FightState,
+  GearId,
+  Quality,
+  Rarity,
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   SeasonId,
   ToastItem,
   TownTab,
   UnderwaterMode,
+<<<<<<< HEAD
   WeaponId,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 } from '@/types'
 import {
   DEFAULT_OWNED,
   DECORATIONS,
+<<<<<<< HEAD
   boatCapacity,
   boatFacilitySlots,
   boatGearCap,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   findShopEntry,
   isBoatSkin,
   isDecoration,
@@ -100,6 +118,7 @@ import {
   type PetState,
 } from '@/game/pet/pet'
 import { clamp } from '@/game/utils/math'
+<<<<<<< HEAD
 import { WEAPONS, weaponById, weaponRefillCost } from '@/game/combat/weapons'
 import { FACILITIES, facilityById, isFacilityId } from '@/game/boat/facilities'
 import {
@@ -120,6 +139,10 @@ import { CREW, crewById } from '@/game/crew/crew'
 
 export const BAG_CAPACITY = 10
 export const MAX_HP = 100
+=======
+
+export const BAG_CAPACITY = 10
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 export const UNDERWATER_MODES: UnderwaterMode[] = ['dive', 'follow', 'orbit']
 export const UNDERWATER_MODE_LABEL: Record<UnderwaterMode, string> = {
   dive: '自由潜游',
@@ -196,6 +219,7 @@ interface PersistedProgress {
   dailySold: DailySold
   gatherCooldowns: Record<string, number>
   stats: StoreStats
+<<<<<<< HEAD
   hp: number
   ownedWeapons: WeaponId[]
   equippedWeapon: WeaponId
@@ -210,6 +234,8 @@ interface PersistedProgress {
   achievements: AchievementMap
   crew: string[]
   relics: string[]
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 interface GameStore extends PersistedProgress {
@@ -221,7 +247,10 @@ interface GameStore extends PersistedProgress {
   bite: boolean
   prompt: string | null
   nearDock: boolean
+<<<<<<< HEAD
   interactLabel: string | null
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   card: Catch | null
   cardAdded: boolean
   marketOpen: boolean
@@ -232,8 +261,11 @@ interface GameStore extends PersistedProgress {
   townOpen: boolean
   townTab: TownTab
   npcId: string | null
+<<<<<<< HEAD
   cookingOpen: boolean
   lightningAt: number
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   captureResult: Catch[] | null
   captureTarget: CaptureTargetInfo | null
   rareFlash: Rarity | null
@@ -245,6 +277,7 @@ interface GameStore extends PersistedProgress {
   oxygen: number
   depth: number
   observedFish: string | null
+<<<<<<< HEAD
   dead: boolean
   hitAt: number
   respawnToken: number
@@ -258,6 +291,8 @@ interface GameStore extends PersistedProgress {
   crewOpen: boolean
   seaEvent: SeaEventHud | null
   chestPrompt: string | null
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -267,7 +302,10 @@ interface GameStore extends PersistedProgress {
   setBite: (bite: boolean) => void
   setPrompt: (prompt: string | null) => void
   setNearDock: (near: boolean) => void
+<<<<<<< HEAD
   setInteractLabel: (label: string | null) => void
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   showCard: (c: Catch, added: boolean) => void
   closeCard: () => void
   addCatch: (c: Catch, method?: CatchMethod) => boolean
@@ -283,8 +321,11 @@ interface GameStore extends PersistedProgress {
   setTownTab: (tab: TownTab) => void
   openNpc: (id: string) => void
   closeNpc: () => void
+<<<<<<< HEAD
   setCookingOpen: (open: boolean) => void
   flashSky: () => void
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   setCaptureResult: (list: Catch[] | null) => void
   setCaptureTarget: (target: CaptureTargetInfo | null) => void
   buyItem: (id: string) => boolean
@@ -327,6 +368,7 @@ interface GameStore extends PersistedProgress {
   abandonQuest: (id: string) => void
   claimQuest: (id: string) => boolean
   refreshDailyQuests: () => void
+<<<<<<< HEAD
   damagePlayer: (amount: number, source?: string) => boolean
   healPlayer: (amount: number) => void
   respawn: () => void
@@ -361,6 +403,8 @@ interface GameStore extends PersistedProgress {
   addRelic: (name: string) => void
   setSeaEvent: (event: SeaEventHud | null) => void
   setChestPrompt: (text: string | null) => void
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
   resetProgress: () => void
@@ -370,6 +414,7 @@ function isObj(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v)
 }
 
+<<<<<<< HEAD
 function isWeaponId(value: unknown): value is WeaponId {
   return typeof value === 'string' && WEAPONS.some((w) => w.id === value)
 }
@@ -402,10 +447,13 @@ function defaultVariantAmmo(): Record<string, number> {
   return out
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 function num(v: unknown, fallback: number) {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
 }
 
+<<<<<<< HEAD
 function sanitizeAchievements(raw: unknown): AchievementMap {
   const map = emptyAchievements()
   if (!isObj(raw)) return map
@@ -430,6 +478,8 @@ function sanitizeCrew(raw: unknown): string[] {
   return out.slice(0, CREW.length)
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 function readSave(): Partial<PersistedProgress> {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
@@ -493,6 +543,7 @@ function readSave(): Partial<PersistedProgress> {
       out.gatherCooldowns = map
     }
     if (isObj(p.stats)) out.stats = p.stats as unknown as StoreStats
+<<<<<<< HEAD
     if (typeof p.hp === 'number') out.hp = p.hp
     if (Array.isArray(p.ownedWeapons)) {
       out.ownedWeapons = p.ownedWeapons.filter(isWeaponId)
@@ -552,6 +603,8 @@ function readSave(): Partial<PersistedProgress> {
     if (Array.isArray(p.relics)) {
       out.relics = p.relics.filter((v): v is string => typeof v === 'string').slice(0, 40)
     }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     return out
   } catch {
     return {}
@@ -674,8 +727,11 @@ function sanitizeStats(raw: StoreStats | undefined): StoreStats {
 }
 
 let toastSeq = 0
+<<<<<<< HEAD
 let achievementSeq = 0
 let achievementPersistAt = 0
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 export const useGameStore = create<GameStore>()((set, get) => {
   const saved = readSave()
@@ -723,6 +779,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
   const codexClaims = (saved.codexClaims ?? []).filter((n) =>
     (CODEX_MILESTONES as readonly number[]).includes(n),
   )
+<<<<<<< HEAD
   const initialHp = Math.round(clamp(num(saved.hp, MAX_HP), 1, MAX_HP))
   const ownedWeapons = Array.from(
     new Set<WeaponId>(['knife', ...(saved.ownedWeapons ?? [])]),
@@ -743,6 +800,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
   const achievements = sanitizeAchievements(saved.achievements)
   const crew = sanitizeCrew(saved.crew)
   const relics = saved.relics ?? []
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   const persist = () => {
     const {
@@ -775,6 +834,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       dailySold,
       gatherCooldowns,
       stats,
+<<<<<<< HEAD
       hp,
       ownedWeapons,
       equippedWeapon,
@@ -789,6 +849,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
       achievements,
       crew,
       relics,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     } = get()
     try {
       localStorage.setItem(
@@ -823,6 +885,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           dailySold,
           gatherCooldowns,
           stats,
+<<<<<<< HEAD
           hp,
           ownedWeapons,
           equippedWeapon,
@@ -837,6 +900,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
           achievements,
           crew,
           relics,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         }),
       )
     } catch {
@@ -901,6 +966,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     dailySold,
     gatherCooldowns,
     stats,
+<<<<<<< HEAD
     hp: initialHp,
     ownedWeapons,
     equippedWeapon,
@@ -915,6 +981,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     achievements,
     crew,
     relics,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     started: false,
     phase: 'idle',
@@ -924,7 +992,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
     bite: false,
     prompt: null,
     nearDock: false,
+<<<<<<< HEAD
     interactLabel: null,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     card: null,
     cardAdded: false,
     marketOpen: false,
@@ -935,8 +1006,11 @@ export const useGameStore = create<GameStore>()((set, get) => {
     townOpen: false,
     townTab: 'quests',
     npcId: null,
+<<<<<<< HEAD
     cookingOpen: false,
     lightningAt: 0,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     captureResult: null,
     captureTarget: null,
     rareFlash: null,
@@ -948,6 +1022,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     oxygen: 100,
     depth: 0,
     observedFish: null,
+<<<<<<< HEAD
     dead: false,
     hitAt: 0,
     respawnToken: 0,
@@ -961,6 +1036,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     crewOpen: false,
     seaEvent: null,
     chestPrompt: null,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -970,13 +1047,17 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setBite: (bite) => set({ bite }),
     setPrompt: (prompt) => set({ prompt }),
     setNearDock: (near) => set({ nearDock: near }),
+<<<<<<< HEAD
     setInteractLabel: (label) => set({ interactLabel: label }),
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     showCard: (c, added) => set({ card: c, cardAdded: added }),
     closeCard: () => set({ card: null }),
 
     addCatch: (c, method = c.method ?? 'rod') => {
       const state = get()
+<<<<<<< HEAD
       const added = state.bag.length < bagCapacity(state)
       const bag = added ? [...state.bag, { ...c, method }] : state.bag
       if (c.junk) {
@@ -986,6 +1067,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
         persist()
         return added
       }
+=======
+      const added = state.bag.length < BAG_CAPACITY
+      const bag = added ? [...state.bag, { ...c, method }] : state.bag
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       const caughtLog = { ...state.caughtLog, [c.defId]: (state.caughtLog[c.defId] ?? 0) + 1 }
       const key = `fish:${c.defId}`
       const codex = {
@@ -1028,6 +1113,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       const state = get()
       const target = state.bag.find((c) => c.id === id)
       if (!target) return
+<<<<<<< HEAD
       const quote = marketQuote(
         target,
         state.season,
@@ -1035,6 +1121,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
         state.dailySold,
         state.installedFacilities.includes('livewell'),
       )
+=======
+      const quote = marketQuote(target, state.season, state.cabinLevel, state.dailySold)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       const dailySold = addDailySold(state.dailySold, quote.price)
       const quests = bumpQuests(state, { kind: 'sell', amount: quote.price })
       set({
@@ -1053,6 +1142,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       const state = get()
       if (!state.bag.length) return
       const quotes = state.bag.map((c) =>
+<<<<<<< HEAD
         marketQuote(
           c,
           state.season,
@@ -1060,6 +1150,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
           state.dailySold,
           state.installedFacilities.includes('livewell'),
         ),
+=======
+        marketQuote(c, state.season, state.cabinLevel, state.dailySold),
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       )
       const total = quotes.reduce((s, q) => s + q.price, 0)
       const dailySold = addDailySold(state.dailySold, total)
@@ -1081,7 +1174,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
         marketOpen: true,
         townOpen: false,
         npcId: null,
+<<<<<<< HEAD
         cookingOpen: false,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         bagOpen: false,
         shopOpen: false,
         baitOpen: false,
@@ -1108,7 +1204,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
         set({
           townOpen: true,
           npcId: null,
+<<<<<<< HEAD
           cookingOpen: false,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
           marketOpen: false,
           bagOpen: false,
           shopOpen: false,
@@ -1124,6 +1223,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setTownTab: (tab) => set({ townTab: tab }),
     openNpc: (id) => {
       if (!npcById(id)) return
+<<<<<<< HEAD
       set({ npcId: id, cookingOpen: false })
     },
     closeNpc: () => set({ npcId: null }),
@@ -1150,6 +1250,11 @@ export const useGameStore = create<GameStore>()((set, get) => {
       }
     },
     flashSky: () => set({ lightningAt: Date.now() }),
+=======
+      set({ npcId: id, townOpen: true })
+    },
+    closeNpc: () => set({ npcId: null }),
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     setCaptureResult: (list) => set({ captureResult: list }),
     setCaptureTarget: (target) => set({ captureTarget: target }),
@@ -1198,9 +1303,12 @@ export const useGameStore = create<GameStore>()((set, get) => {
         captureTarget: null,
         townOpen: false,
         npcId: null,
+<<<<<<< HEAD
         cookingOpen: false,
         combatCamera: false,
         inputLocked: underwater ? false : get().inputLocked,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       })
       if (underwater) {
         state.toast('已潜入水下 · 左键使用工具 / V 上浮', 'info')
@@ -1239,10 +1347,14 @@ export const useGameStore = create<GameStore>()((set, get) => {
         money: state.money - entry.price,
         ownedItems,
       }
+<<<<<<< HEAD
       if (entry.kind === 'boat' && isBoatSkin(id)) {
         patch.boatSkin = id
         patch.installedFacilities = resizeInstalled(state.installedFacilities, id)
       }
+=======
+      if (entry.kind === 'boat' && isBoatSkin(id)) patch.boatSkin = id
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       if (entry.kind === 'rod' && isRodSkin(id)) patch.rodSkin = id
       if (entry.kind === 'decoration' && isDecoration(id) && !state.decorations.includes(id)) {
         patch.decorations = [...state.decorations, id]
@@ -1257,10 +1369,14 @@ export const useGameStore = create<GameStore>()((set, get) => {
     equipBoat: (id) => {
       const state = get()
       if (!state.ownedItems.includes(id)) return
+<<<<<<< HEAD
       set({
         boatSkin: id,
         installedFacilities: resizeInstalled(state.installedFacilities, id),
       })
+=======
+      set({ boatSkin: id })
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       const style = findShopEntry(id)
       get().toast(`已换乘 ${style?.name ?? '新船'}`, 'gold')
       persist()
@@ -1401,7 +1517,11 @@ export const useGameStore = create<GameStore>()((set, get) => {
         state.toast(`鱼笼还要 ${Math.ceil((trap.readyAt - now) / 1000)} 秒`, 'info')
         return false
       }
+<<<<<<< HEAD
       if (state.bag.length >= bagCapacity(state)) {
+=======
+      if (state.bag.length >= BAG_CAPACITY) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         state.toast('鱼篓满了，先腾出位置再收笼', 'danger')
         return false
       }
@@ -1922,6 +2042,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       persist()
     },
 
+<<<<<<< HEAD
     damagePlayer: (amount, source = '海怪') => {
       const state = get()
       if (state.dead) return false
@@ -2373,6 +2494,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setSeaEvent: (seaEvent) => set({ seaEvent }),
     setChestPrompt: (chestPrompt) => set({ chestPrompt }),
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     toast: (text, tone = 'info') => {
       toastSeq += 1
       const id = toastSeq
@@ -2422,6 +2545,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         dailySold: { day: todayKey, value: 0 },
         gatherCooldowns: {},
         stats: { cooked: 0, harvested: 0, gathered: 0, soldValue: 0 },
+<<<<<<< HEAD
         hp: MAX_HP,
         ownedWeapons: ['knife'],
         equippedWeapon: 'knife',
@@ -2443,6 +2567,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
         nav: null,
         interactLabel: null,
         nearDock: false,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         baitWear: 100,
         card: null,
         fight: null,
@@ -2452,12 +2578,16 @@ export const useGameStore = create<GameStore>()((set, get) => {
         townOpen: false,
         townTab: 'quests',
         npcId: null,
+<<<<<<< HEAD
         cookingOpen: false,
         lightningAt: 0,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
         captureResult: null,
         captureTarget: null,
         rareFlash: null,
         lastCook: null,
+<<<<<<< HEAD
         achievements: emptyAchievements(),
         crew: [],
         relics: [],
@@ -2466,18 +2596,24 @@ export const useGameStore = create<GameStore>()((set, get) => {
         crewOpen: false,
         seaEvent: null,
         chestPrompt: null,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       })
       persist()
     },
   }
 })
 
+<<<<<<< HEAD
 export function bagCapacity(state: GameStore = useGameStore.getState()) {
   const livewell = state.installedFacilities.includes('livewell') ? 6 : 0
   return boatCapacity(state.boatSkin) + livewell
 }
 
 export function isModalOpen(state: GameStore = useGameStore.getState()) {
+=======
+export function isModalOpen(state = useGameStore.getState()) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   return Boolean(
     state.card ||
       state.marketOpen ||
@@ -2487,6 +2623,7 @@ export function isModalOpen(state: GameStore = useGameStore.getState()) {
       state.seasonOpen ||
       state.townOpen ||
       state.npcId ||
+<<<<<<< HEAD
       state.cookingOpen ||
       state.captureResult ||
       state.achievementsOpen ||
@@ -2504,6 +2641,21 @@ export function questDefsMapForState(state: GameStore = useGameStore.getState())
 }
 
 export function codexProgress(state: GameStore = useGameStore.getState()) {
+=======
+      state.captureResult,
+  )
+}
+
+export function dailyQuestsForState(state = useGameStore.getState()) {
+  return dailyQuestList(state.questDay, state.questSeason)
+}
+
+export function questDefsMapForState(state = useGameStore.getState()) {
+  return questDefsById(state.questDay, state.questSeason)
+}
+
+export function codexProgress(state = useGameStore.getState()) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const total = FISH.length + CROPS.length + RECIPES.length + FORAGE.length
   const collected =
     FISH.filter((f) => (state.codex[`fish:${f.id}`]?.count ?? 0) > 0).length +
@@ -2513,11 +2665,19 @@ export function codexProgress(state: GameStore = useGameStore.getState()) {
   return { collected, total, pct: total ? (collected / total) * 100 : 0 }
 }
 
+<<<<<<< HEAD
 export function currentToolStats(state: GameStore = useGameStore.getState()) {
   return toolStats(state.activeTool, state.tools[state.activeTool].level)
 }
 
 export function currentDailyFactor(state: GameStore = useGameStore.getState()) {
+=======
+export function currentToolStats(state = useGameStore.getState()) {
+  return toolStats(state.activeTool, state.tools[state.activeTool].level)
+}
+
+export function currentDailyFactor(state = useGameStore.getState()) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   return dailySellFactor(state.dailySold)
 }
 

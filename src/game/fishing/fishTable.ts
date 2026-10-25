@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import type { BaitId, Catch, CatchMethod, DayPeriod, Rarity, SeasonId, WaterId } from '@/types'
+=======
+import type { BaitId, Catch, CatchMethod, DayPeriod, Rarity, SeasonId } from '@/types'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 export interface RarityMeta {
   label: string
@@ -32,7 +36,10 @@ export interface FishDef {
   seasons?: SeasonId[]
   periods?: DayPeriod[]
   baits?: Partial<Record<BaitId, number>>
+<<<<<<< HEAD
   zones?: WaterId[]
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 export const FISH: FishDef[] = [
@@ -320,6 +327,7 @@ export const FISH: FishDef[] = [
     periods: ['night'],
     baits: { worm: 1.8, pellet: 1.7, minnow: 1.2 },
   },
+<<<<<<< HEAD
   {
     id: 'mirrorcarp',
     name: '镜影鲤',
@@ -416,6 +424,8 @@ export const FISH: FishDef[] = [
     baits: { spoon: 1.8, minnow: 1.7 },
     zones: ['trench'],
   },
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 ]
 
 const FISH_BY_ID = new Map(FISH.map((f) => [f.id, f]))
@@ -429,7 +439,10 @@ export interface FishPickContext {
   period?: DayPeriod
   bait?: BaitId
   baitWear?: number
+<<<<<<< HEAD
   zone?: WaterId | null
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 export function baitPreference(def: FishDef, bait?: BaitId) {
@@ -457,12 +470,16 @@ export function pickFish(depth: number, ctx: FishPickContext = {}): FishDef {
       : 1
     const pref = baitPreference(f, ctx.bait)
     const baitBoost = 1 + (pref - 1) * freshness
+<<<<<<< HEAD
     const zoneBoost = f.zones
       ? ctx.zone && f.zones.includes(ctx.zone)
         ? 4.5
         : 0.05
       : 1
     const w = rarity.weight * depthBoost * seasonBoost * periodBoost * baitBoost * zoneBoost
+=======
+    const w = rarity.weight * depthBoost * seasonBoost * periodBoost * baitBoost
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     total += w
     return w
   })

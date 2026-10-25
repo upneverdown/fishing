@@ -189,6 +189,7 @@ class GameAudio {
     src.stop(now + 0.18)
   }
 
+<<<<<<< HEAD
   thunder() {
     const ctx = this.ctx
     const master = this.master
@@ -225,6 +226,10 @@ class GameAudio {
   }
 
   caught() {    const ctx = this.ctx
+=======
+  caught() {
+    const ctx = this.ctx
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (!ctx || this.muted) return
     const now = ctx.currentTime
     const notes = [523.25, 659.25, 783.99]

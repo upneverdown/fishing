@@ -19,6 +19,7 @@ class InputController {
   private seasonPress = false
   private toolPress = false
   private townPress = false
+<<<<<<< HEAD
   private knifePress = false
   private gunPress = false
   private anchorPress = false
@@ -27,6 +28,8 @@ class InputController {
   private variantPress = false
   private achievementsPress = false
   private crewPress = false
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   private slotPress = 0
   private joy = { x: 0, y: 0, active: false }
   private canvas: HTMLCanvasElement | null = null
@@ -117,6 +120,7 @@ class InputController {
     if (key === 't') this.seasonPress = true
     if (key === 'f') this.toolPress = true
     if (key === 'g') this.townPress = true
+<<<<<<< HEAD
     if (key === 'z') this.knifePress = true
     if (key === 'x') this.gunPress = true
     if (key === 'y') this.anchorPress = true
@@ -125,6 +129,8 @@ class InputController {
     if (key === 'q') this.variantPress = true
     if (key === 'j') this.achievementsPress = true
     if (key === 'k') this.crewPress = true
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     if (key === '1') this.slotPress = 1
     if (key === '2') this.slotPress = 2
     if (key === '3') this.slotPress = 3
@@ -238,6 +244,7 @@ class InputController {
     return slot
   }
 
+<<<<<<< HEAD
   consumeKnife() {
     const pressed = this.knifePress
     this.knifePress = false
@@ -286,6 +293,8 @@ class InputController {
     return pressed
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   consumeLook() {
     const dx = this.lookX
     const dy = this.lookY
@@ -309,12 +318,20 @@ class InputController {
   }
 
   get vertical() {
+<<<<<<< HEAD
     const keyboard = (this.spaceHeld ? 1 : 0) - (this.keys.has('shift') ? 1 : 0)
+=======
+    const keyboard = (this.spaceHeld ? 1 : 0) - (this.keys.has('control') ? 1 : 0)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     return clamp(keyboard + this.touchVertical, -1, 1)
   }
 
   get sprint() {
+<<<<<<< HEAD
     return this.keys.has('control') || this.touchSprint
+=======
+    return this.keys.has('shift') || this.touchSprint
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   tapInteract() {
@@ -337,6 +354,7 @@ class InputController {
     this.townPress = true
   }
 
+<<<<<<< HEAD
   tapKnife() {
     this.knifePress = true
   }
@@ -361,6 +379,8 @@ class InputController {
     this.variantPress = true
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   clear() {
     this.keys.clear()
     this.actionSources.clear()
@@ -374,6 +394,7 @@ class InputController {
     this.seasonPress = false
     this.toolPress = false
     this.townPress = false
+<<<<<<< HEAD
     this.knifePress = false
     this.gunPress = false
     this.anchorPress = false
@@ -382,6 +403,8 @@ class InputController {
     this.variantPress = false
     this.achievementsPress = false
     this.crewPress = false
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.slotPress = 0
     this.spaceHeld = false
     this.touchVertical = 0
@@ -406,6 +429,7 @@ class InputController {
     this.seasonPress = false
     this.toolPress = false
     this.townPress = false
+<<<<<<< HEAD
     this.knifePress = false
     this.gunPress = false
     this.anchorPress = false
@@ -414,6 +438,8 @@ class InputController {
     this.variantPress = false
     this.achievementsPress = false
     this.crewPress = false
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.slotPress = 0
     this.clickPoint = null
   }

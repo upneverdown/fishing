@@ -12,25 +12,39 @@ import { BAITS } from '@/game/fishing/baitTable'
 import { METHOD_COLOR, METHOD_LABEL } from '@/game/capture/tools'
 import { marketQuote } from '@/game/economy/market'
 import { DAY_PERIOD_LABEL, SEASONS } from '@/game/world/seasons'
+<<<<<<< HEAD
 import { bagCapacity, useGameStore } from '@/store/useGameStore'
+=======
+import { BAG_CAPACITY, useGameStore } from '@/store/useGameStore'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { cn } from '@/lib/utils'
 
 export function FishCardDialog() {
   const card = useGameStore((s) => s.card)
   const cardAdded = useGameStore((s) => s.cardAdded)
   const bagCount = useGameStore((s) => s.bag.length)
+<<<<<<< HEAD
   const capacity = useGameStore((s) => bagCapacity(s))
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const closeCard = useGameStore((s) => s.closeCard)
   const season = useGameStore((s) => s.season)
   const cabinLevel = useGameStore((s) => s.cabinLevel)
   const dailySold = useGameStore((s) => s.dailySold)
+<<<<<<< HEAD
   const livewell = useGameStore((s) => s.installedFacilities.includes('livewell'))
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const meta = card ? RARITIES[card.rarity] : null
   const showSparkle = card ? RARITY_ORDER.indexOf(card.rarity) >= 2 : false
   const ink = card?.rarity === 'common' ? '#5d706b' : meta?.color
   const def = card ? fishById(card.defId) : undefined
   const method = card?.method ?? 'rod'
+<<<<<<< HEAD
   const quote = card ? marketQuote(card, season, cabinLevel, dailySold, livewell) : null
+=======
+  const quote = card ? marketQuote(card, season, cabinLevel, dailySold, card.caughtAt) : null
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const quoted = quote?.price ?? card?.value ?? 0
   const bonusBits: string[] = []
   if (quote) {
@@ -175,7 +189,11 @@ export function FishCardDialog() {
               )}
             >
               {cardAdded
+<<<<<<< HEAD
                 ? `已收入鱼篓 · ${bagCount}/${capacity} · 划回老码头就能卖个好价钱`
+=======
+                ? `已收入鱼篓 · ${bagCount}/${BAG_CAPACITY} · 划回老码头就能卖个好价钱`
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
                 : '鱼篓已经塞满了，这条鱼只能放回水里'}
             </div>
 

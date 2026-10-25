@@ -17,7 +17,11 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Button } from '@/components/ui/button'
 import { FishArt } from '@/components/FishArt'
 import { RarityDot } from '@/components/RarityBadge'
+<<<<<<< HEAD
 import { bagCapacity, currentDailyFactor, useGameStore } from '@/store/useGameStore'
+=======
+import { BAG_CAPACITY, currentDailyFactor, useGameStore } from '@/store/useGameStore'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { freshnessOf, marketQuote } from '@/game/economy/market'
 import { SEASONS } from '@/game/world/seasons'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -121,8 +125,11 @@ export function MarketDialog() {
   const open = useGameStore((s) => s.marketOpen)
   const close = useGameStore((s) => s.closeMarket)
   const bag = useGameStore((s) => s.bag)
+<<<<<<< HEAD
   const capacity = useGameStore((s) => bagCapacity(s))
   const livewell = useGameStore((s) => s.installedFacilities.includes('livewell'))
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const money = useGameStore((s) => s.money)
   const sellOne = useGameStore((s) => s.sellOne)
   const sellAll = useGameStore((s) => s.sellAll)
@@ -144,10 +151,17 @@ export function MarketDialog() {
     setSessionEarned(0)
   }, [open])
 
+<<<<<<< HEAD
   const quoteOf = (c: Catch) => marketQuote(c, season, cabinLevel, dailySold, livewell).price
   const total = useMemo(
     () => bag.reduce((sum, c) => sum + quoteOf(c), 0),
     [bag, season, cabinLevel, dailySold, livewell],
+=======
+  const quoteOf = (c: Catch) => marketQuote(c, season, cabinLevel, dailySold).price
+  const total = useMemo(
+    () => bag.reduce((sum, c) => sum + quoteOf(c), 0),
+    [bag, season, cabinLevel, dailySold],
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   )
   const dailyFactor = currentDailyFactor()
 
@@ -253,7 +267,11 @@ export function MarketDialog() {
                     <div className="flex items-center gap-1.5 text-[10.5px] font-medium tracking-[0.16em] text-foam/50">
                       待售渔获
                       <span className="tnum rounded-full bg-foam/8 px-1.5 py-0.5 text-[9.5px] text-foam/55">
+<<<<<<< HEAD
                         {bag.length}/{capacity}
+=======
+                        {bag.length}/{BAG_CAPACITY}
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
                       </span>
                     </div>
                     <span className="tnum text-[10.5px] text-muted-foreground">估值 ¥{total}</span>

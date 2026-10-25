@@ -141,6 +141,7 @@
   }
 }
 
+<<<<<<< HEAD
 @keyframes lightning-flash {
   0% {
     opacity: 0;
@@ -275,6 +276,8 @@
   animation: steam-rise 2.1s ease-out infinite;
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

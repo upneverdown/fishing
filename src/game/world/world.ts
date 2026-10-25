@@ -101,6 +101,7 @@ const UNDERWATER_SHALLOW = new THREE.Color('#2b7f83')
 const UNDERWATER_DEEP = new THREE.Color('#031a24')
 const UNDERWATER_SCATTER = new THREE.Color('#58d6c4')
 
+<<<<<<< HEAD
 const STORM_BG = new THREE.Color('#0a1418')
 const STORM_FOG = new THREE.Color('#13252a')
 const STORM_ZENITH = new THREE.Color('#0d161b')
@@ -139,13 +140,18 @@ function lightningTexture() {
   return texture
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 export class World {
   readonly water: Water
   readonly foam: Foam
 
   private buoys: Buoy[]
   private waterfallMaterial: THREE.ShaderMaterial
+<<<<<<< HEAD
   private waterfallUpdate: (time: number, dt: number) => void
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   private hemi: THREE.HemisphereLight
   private sun: THREE.DirectionalLight
   private fill: THREE.DirectionalLight
@@ -155,12 +161,15 @@ export class World {
   private lilies: THREE.InstancedMesh
   private ice: IceFloeField
   private diveLight: THREE.PointLight
+<<<<<<< HEAD
   private lightningLight: THREE.PointLight
   private lightningSprite: THREE.Sprite
   private lightningFlash = 0
   private lightningOffset = new THREE.Vector3()
   private storm = 0
   private stormTarget = 0
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   private seasonId: SeasonId = 'spring'
   private look: SeasonLook
@@ -206,6 +215,7 @@ export class World {
     const waterfall = createWaterfall()
     scene.add(waterfall.group)
     this.waterfallMaterial = waterfall.material
+<<<<<<< HEAD
     this.waterfallUpdate = waterfall.update
 
     this.lightningLight = new THREE.PointLight('#dff6ff', 0, 320, 2)
@@ -227,6 +237,8 @@ export class World {
     this.lightningSprite.visible = false
     this.lightningSprite.renderOrder = 8
     scene.add(this.lightningSprite)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
     this.buoys = createBuoys()
     for (const buoy of this.buoys) scene.add(buoy.group)
@@ -300,6 +312,7 @@ export class World {
     this.diveLight.position.copy(position)
   }
 
+<<<<<<< HEAD
   setStorm(strength: number) {
     this.stormTarget = THREE.MathUtils.clamp(strength, 0, 1)
   }
@@ -318,6 +331,8 @@ export class World {
     this.lightningSprite.material.rotation = (Math.random() - 0.5) * 0.16
   }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   private lerpLook(dt: number) {
     const k = 1 - Math.exp(-dt * 2.2)
     const a = this.look
@@ -409,6 +424,7 @@ export class World {
       this.water.setWaveScale(look.waveScale)
       this.water.setSun(this.sunDir, look.sun)
     }
+<<<<<<< HEAD
 
     if (!this.underwater && this.storm > 0.002) {
       const s = this.storm
@@ -431,17 +447,23 @@ export class World {
       background.lerp(FLASH_COLOR, this.lightningFlash * 0.3)
       fog.color.lerp(FLASH_COLOR, this.lightningFlash * 0.12)
     }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   update(time: number, dt: number, center: THREE.Vector3) {
     this.time = time
+<<<<<<< HEAD
     this.storm += (this.stormTarget - this.storm) * (1 - Math.exp(-dt * 1.7))
     this.lightningFlash = Math.max(0, this.lightningFlash - dt * 2.6)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     this.lerpLook(dt)
     this.applyScene(center)
 
     this.water.setTime(time)
     this.waterfallMaterial.uniforms.uTime.value = time
+<<<<<<< HEAD
     this.waterfallUpdate(time, dt)
     this.sky.material.uniforms.uTime.value = time
 
@@ -457,6 +479,10 @@ export class World {
       this.water.setFogRange(4, 118)
     }
 
+=======
+    this.sky.material.uniforms.uTime.value = time
+
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     for (const buoy of this.buoys) {
       const wave = this.water.waveHeight(buoy.x, buoy.z, time)
       buoy.group.position.y = wave + 0.02

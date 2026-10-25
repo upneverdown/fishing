@@ -5,7 +5,10 @@ export type DialogueAction =
   | { type: 'market' }
   | { type: 'gift' }
   | { type: 'pet' }
+<<<<<<< HEAD
   | { type: 'crew' }
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   | { type: 'close' }
 
 export interface DialogueCondition {
@@ -219,6 +222,7 @@ export const NPCS: NpcDef[] = [
     },
   },
   {
+<<<<<<< HEAD
     id: 'bo',
     name: '泊叔',
     role: '船员中介',
@@ -260,6 +264,8 @@ export const NPCS: NpcDef[] = [
     },
   },
   {
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     id: 'azhou',
     name: '阿舟',
     role: '海湾向导',

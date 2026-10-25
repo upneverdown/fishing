@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import {
   Anchor,
   Archive,
@@ -19,6 +20,12 @@ import {
 } from '@/game/capture/variants'
 import { WEAPONS, weaponById, weaponRefillCost } from '@/game/combat/weapons'
 import { GEAR, gearUpgradeCost } from '@/game/gear/gear'
+=======
+import { Anchor, Archive, Crosshair, Grid3X3, Hammer, Wrench } from 'lucide-react'
+import { useGameStore } from '@/store/useGameStore'
+import { CAPTURE_TOOLS, toolById, toolRepairCost, toolStats, toolUpgradeCost } from '@/game/capture/tools'
+import { GEAR, gearById, gearUpgradeCost } from '@/game/gear/gear'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { Button } from '@/components/ui/button'
 import { Bar, Chip, CoinPill, PanelHead } from './shared'
 import { cn } from '@/lib/utils'
@@ -140,6 +147,7 @@ function ToolCard({ id }: { id: (typeof CAPTURE_TOOLS)[number]['id'] }) {
   )
 }
 
+<<<<<<< HEAD
 function WeaponCard({ id }: { id: (typeof WEAPONS)[number]['id'] }) {
   const def = weaponById(id)
   const owned = useGameStore((s) => s.ownedWeapons.includes(id))
@@ -335,6 +343,8 @@ function VariantCard({ id }: { id: ToolVariantId }) {
   )
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-abyss/30 py-1">
@@ -371,6 +381,7 @@ export function ShopPanel() {
 
       <div>
         <div className="mb-1.5 flex items-center gap-1.5 text-[10px] tracking-[0.18em] text-foam/45">
+<<<<<<< HEAD
           <Gauge className="size-3" />
           进阶捕捞工具
           <span className="ml-auto text-[8.5px] normal-case tracking-normal text-foam/25">
@@ -409,6 +420,8 @@ export function ShopPanel() {
 
       <div>
         <div className="mb-1.5 flex items-center gap-1.5 text-[10px] tracking-[0.18em] text-foam/45">
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
           <Hammer className="size-3" />
           钓鱼装备
         </div>
@@ -466,7 +479,11 @@ export function ShopPanel() {
 
       <div className="flex items-start gap-2 rounded-xl border border-border/40 bg-abyss/25 p-2.5 text-[9px] leading-relaxed text-foam/35">
         <Anchor className="mt-0.5 size-3 shrink-0 text-tide/60" />
+<<<<<<< HEAD
         鱼叉适合点杀稀有鱼，渔网适合清小鱼，鱼笼放着就能干活。工具没耐久时无法出手；鱼枪与炸药叉头需要定期补给。
+=======
+        鱼叉适合点杀稀有鱼，渔网适合清小鱼，鱼笼放着就能干活。工具没耐久时无法出手，回铺子修一下就好。
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
       </div>
     </div>
   )

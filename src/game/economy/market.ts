@@ -40,12 +40,18 @@ export function marketQuote(
   season: SeasonId,
   cabinLevel: number,
   daily: DailySold,
+<<<<<<< HEAD
   livewell = false,
   now = Date.now(),
 ): MarketQuote {
   const freshness = livewell
     ? clamp(freshnessOf(c, now) + 0.12, 0.5, 1)
     : freshnessOf(c, now)
+=======
+  now = Date.now(),
+): MarketQuote {
+  const freshness = freshnessOf(c, now)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const demand = DEMAND[season][c.rarity]
   const cabinBonus = 1 + Math.max(0, cabinLevel - 1) * 0.05
   const dailyFactor = dailySellFactor(daily, now)

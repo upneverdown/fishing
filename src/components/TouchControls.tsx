@@ -2,9 +2,15 @@ import { useCallback, useRef, useState } from 'react'
 import {
   ArrowDownToLine,
   ArrowUpRight,
+<<<<<<< HEAD
   Cast,
   Fish,
   Hand,
+=======
+  Banknote,
+  Cast,
+  Fish,
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   RotateCcw,
 } from 'lucide-react'
 import { input } from '@/game/input'
@@ -86,7 +92,11 @@ export function Joystick({ label = '划船' }: { label?: string }) {
 
 export function TouchControls() {
   const phase = useGameStore((s) => s.phase)
+<<<<<<< HEAD
   const interactLabel = useGameStore((s) => s.interactLabel)
+=======
+  const nearDock = useGameStore((s) => s.nearDock)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const fight = useGameStore((s) => s.fight)
   const meta = ACTION_META[phase]
   const Icon = meta.icon
@@ -99,14 +109,23 @@ export function TouchControls() {
       <Joystick />
 
       <div className="flex flex-col items-center gap-3">
+<<<<<<< HEAD
         {interactLabel && (
+=======
+        {nearDock && (
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
           <button
             type="button"
             onClick={() => input.tapInteract()}
             className="glass pointer-events-auto flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[11.5px] font-medium text-gold shadow-lg active:translate-y-px"
           >
+<<<<<<< HEAD
             <Hand className="size-3.5" />
             {interactLabel}
+=======
+            <Banknote className="size-3.5" />
+            卖鱼
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
           </button>
         )}
 

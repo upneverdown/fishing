@@ -3,16 +3,25 @@ import type { Boat } from '@/game/entities/boat'
 import type { World } from '@/game/world/world'
 import { Bobber } from './bobber'
 import { RARITY_ORDER, createCatch, pickFish, type FishDef } from './fishTable'
+<<<<<<< HEAD
 import { createJunk } from './junkTable'
 import { baitById } from './baitTable'
 import { SEASONS } from '@/game/world/seasons'
 import { input } from '@/game/input'
 import { gameEvents } from '@/game/eventBus'
+=======
+import { baitById } from './baitTable'
+import { SEASONS } from '@/game/world/seasons'
+import { input } from '@/game/input'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { isModalOpen, useGameStore } from '@/store/useGameStore'
 import { clamp, lerp, randRange } from '@/game/utils/math'
 import { audio } from '@/game/audio/gameAudio'
 import { gearValue } from '@/game/gear/gear'
+<<<<<<< HEAD
 import { waterAt } from '@/game/world/waters'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import type { Catch, FishingPhase } from '@/types'
 
 const MIN_CAST = 7
@@ -50,7 +59,10 @@ export class FishingSystem {
   private waitTime = 0
   private biteTime = 0
   private def: FishDef | null = null
+<<<<<<< HEAD
   private castSpeed = 0
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   private progress = 0
   private tension = 0
@@ -120,7 +132,10 @@ export class FishingSystem {
       period: SEASONS[store.season].period,
       bait: store.baitId,
       baitWear: store.baitWear,
+<<<<<<< HEAD
       zone: waterAt(this.anchor.x, this.anchor.z)?.id ?? null,
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     })
   }
 
@@ -243,7 +258,10 @@ export class FishingSystem {
   }
 
   private cast(time: number) {
+<<<<<<< HEAD
     this.castSpeed = Math.abs(this.boat.speed)
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     const fwd = this.boat.getForward(this.boatFwd)
     const dist = MIN_CAST + (MAX_CAST - MIN_CAST) * this.power
     this.anchor.set(
@@ -404,8 +422,12 @@ export class FishingSystem {
     const def = this.def
     if (!def) return
 
+<<<<<<< HEAD
     const junkChance = this.castSpeed >= 2 ? 0.5 : 0.07
     const caught = Math.random() < junkChance ? createJunk() : createCatch(def)
+=======
+    const caught = createCatch(def)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     const added = store.addCatch(caught)
     store.setFight(null)
     store.setBite(false)
@@ -428,6 +450,7 @@ export class FishingSystem {
     this.line.visible = false
     this.hideAim()
 
+<<<<<<< HEAD
     if (!added) {
       store.toast('鱼篓满了，这条鱼只能放回水里', 'danger')
     } else if (!caught.junk) {
@@ -436,6 +459,10 @@ export class FishingSystem {
     if (caught.junk && added) {
       gameEvents.emit('catch:junk', { defId: caught.defId, speed: this.castSpeed })
     }
+=======
+    if (!added) store.toast('鱼篓满了，这条鱼只能放回水里', 'danger')
+    else store.toast(`上鱼！${caught.name} · ${caught.kg}kg`, 'gold')
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   }
 
   private spawnJump() {

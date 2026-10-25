@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 import type { WaterId } from '@/types'
 
 export type BoatSkinId = 'rowboat' | 'speedboat' | 'patrol' | 'submarine' | 'icebreaker' | 'pirate'
+=======
+export type BoatSkinId = 'rowboat' | 'speedboat' | 'patrol' | 'submarine'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 export type RodSkinId = 'classic' | 'tide' | 'ember' | 'aurora'
 export type DecorationId = 'figurehead' | 'garland' | 'flag' | 'crate'
 
@@ -15,6 +19,7 @@ export interface BoatStyle {
   speed: number
   turn: number
   accent: string
+<<<<<<< HEAD
   tier: number
   classLabel: string
   capacity: number
@@ -23,6 +28,8 @@ export interface BoatStyle {
   durability: number
   weatherproof: boolean
   waters: WaterId[]
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 export interface RodSkin {
@@ -56,6 +63,7 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1,
     turn: 1,
     accent: '#c9945e',
+<<<<<<< HEAD
     tier: 1,
     classLabel: '小木船',
     capacity: 10,
@@ -64,6 +72,8 @@ export const BOAT_STYLES: BoatStyle[] = [
     durability: 70,
     weatherproof: false,
     waters: ['bay', 'creek'],
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   },
   {
     id: 'speedboat',
@@ -74,6 +84,7 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1.38,
     turn: 1.18,
     accent: '#5fd8c9',
+<<<<<<< HEAD
     tier: 2,
     classLabel: '快艇',
     capacity: 16,
@@ -82,6 +93,8 @@ export const BOAT_STYLES: BoatStyle[] = [
     durability: 90,
     weatherproof: false,
     waters: ['bay', 'creek', 'falls', 'mirror'],
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   },
   {
     id: 'patrol',
@@ -92,6 +105,7 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1.15,
     turn: 0.86,
     accent: '#8fb0bd',
+<<<<<<< HEAD
     tier: 3,
     classLabel: '豪华游艇',
     capacity: 26,
@@ -100,6 +114,8 @@ export const BOAT_STYLES: BoatStyle[] = [
     durability: 120,
     weatherproof: true,
     waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   },
   {
     id: 'submarine',
@@ -110,6 +126,7 @@ export const BOAT_STYLES: BoatStyle[] = [
     speed: 1.06,
     turn: 1.12,
     accent: '#d8b45a',
+<<<<<<< HEAD
     tier: 3,
     classLabel: '潜航艇',
     capacity: 20,
@@ -154,6 +171,8 @@ export const BOAT_STYLES: BoatStyle[] = [
     durability: 320,
     weatherproof: true,
     waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   },
 ]
 
@@ -267,6 +286,7 @@ export function isBoatSkin(id: string): id is BoatSkinId {
   return BOAT_STYLES.some((s) => s.id === id)
 }
 
+<<<<<<< HEAD
 export function boatStyle(id: BoatSkinId): BoatStyle {
   return BOAT_STYLES.find((s) => s.id === id) ?? BOAT_STYLES[0]
 }
@@ -283,6 +303,8 @@ export function boatFacilitySlots(id: BoatSkinId): number {
   return boatStyle(id).facilitySlots
 }
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 export function isRodSkin(id: string): id is RodSkinId {
   return ROD_SKINS.some((s) => s.id === id)
 }

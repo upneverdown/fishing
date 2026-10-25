@@ -21,6 +21,7 @@ export interface RecipeDef {
 
 export const RECIPES: RecipeDef[] = [
   {
+<<<<<<< HEAD
     id: 'campfire-grill',
     name: '篝火盐烤鱼',
     method: '篝火直烤',
@@ -54,6 +55,8 @@ export const RECIPES: RecipeDef[] = [
     effect: '食用后恢复 30 点潜水氧气',
   },
   {
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     id: 'grilled-crucian',
     name: '炭烤鲫鱼',
     method: '炭火直烤',

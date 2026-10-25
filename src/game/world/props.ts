@@ -405,6 +405,7 @@ const fallFragment = /* glsl */ `
 
   void main() {
     float t = uTime;
+<<<<<<< HEAD
     float edge = smoothstep(0.0, 0.07, vUv.x) * smoothstep(0.0, 0.07, 1.0 - vUv.x);
     float fade = smoothstep(0.02, 0.12, vUv.y) * smoothstep(0.0, 0.1, 1.0 - vUv.y);
 
@@ -424,12 +425,22 @@ const fallFragment = /* glsl */ `
     color = mix(color, vec3(1.0), top * 0.18);
 
     float alpha = (0.22 + stream * 0.38 + shine * 0.22 + bottom * 0.24) * edge * fade;
+=======
+    float wave = sin(vUv.y * 12.0 + t * 2.4) * 0.5 + 0.5;
+    float streak = sin(vUv.x * 96.0 + wave * 2.2) * 0.5 + 0.5;
+    float flow = sin(vUv.y * 46.0 - t * 7.0 + vUv.x * 6.0) * 0.5 + 0.5;
+    float alpha = 0.26 + streak * 0.55 * (0.4 + flow * 0.6);
+    alpha *= smoothstep(0.0, 0.1, vUv.y) * smoothstep(0.0, 0.08, 1.0 - vUv.y);
+    alpha *= smoothstep(0.0, 0.05, vUv.x) * smoothstep(0.0, 0.05, 1.0 - vUv.x);
+    vec3 color = mix(vec3(0.55, 0.88, 0.86), vec3(1.0), streak * 0.75);
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     gl_FragColor = vec4(color, alpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
 `
 
+<<<<<<< HEAD
 function mistTexture() {
   const size = 128
   const canvas = document.createElement('canvas')
@@ -452,6 +463,9 @@ export function createWaterfall(): {
   material: THREE.ShaderMaterial
   update: (time: number, dt: number) => void
 } {
+=======
+export function createWaterfall(): { group: THREE.Group; material: THREE.ShaderMaterial } {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
   const group = new THREE.Group()
 
   const cliffMat = new THREE.MeshStandardMaterial({ color: '#6c746b', roughness: 1, flatShading: true })
@@ -489,13 +503,18 @@ export function createWaterfall(): {
     opacity: 0.4,
     depthWrite: false,
   })
+<<<<<<< HEAD
   for (let i = 0; i < 5; i++) {
+=======
+  for (let i = 0; i < 4; i++) {
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     const foam = new THREE.Mesh(new THREE.CircleGeometry(1.4 + i * 0.9, 18), foamMat.clone())
     foam.rotation.x = -Math.PI / 2
     foam.position.set(38.5 + (i % 2 === 0 ? -1 : 1) * 0.9, 0.06, 60.6 + i * 0.55)
     group.add(foam)
   }
 
+<<<<<<< HEAD
   const splashCount = 110
   const splashPositions = new Float32Array(splashCount * 3)
   const splashVelocity = new Float32Array(splashCount * 3)
@@ -584,6 +603,9 @@ export function createWaterfall(): {
   }
 
   return { group, material, update }
+=======
+  return { group, material }
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 }
 
 export interface Buoy {

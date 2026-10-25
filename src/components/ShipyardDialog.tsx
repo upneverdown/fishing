@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import { useState } from 'react'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import {
   Anchor,
   Box,
@@ -6,6 +9,7 @@ import {
   Coins,
   Fish,
   Flag,
+<<<<<<< HEAD
   Flame,
   Flashlight,
   Lightbulb,
@@ -16,16 +20,26 @@ import {
   Wrench,
   X,
   type LucideIcon,
+=======
+  Lightbulb,
+  Ship,
+  Sparkles,
+  X,
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+<<<<<<< HEAD
 import { BoatPreview } from '@/components/BoatPreview'
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 import { useGameStore } from '@/store/useGameStore'
 import {
   BOAT_STYLES,
   DECORATIONS,
   ROD_SKINS,
+<<<<<<< HEAD
   boatFacilitySlots,
   type BoatSkinId,
   type DecorationId,
@@ -42,6 +56,12 @@ const FACILITY_ICONS: Record<FacilityId, LucideIcon> = {
   grill: Flame,
   anchor: Anchor,
 }
+=======
+  type BoatSkinId,
+  type DecorationId,
+} from '@/game/shop/catalog'
+import { cn } from '@/lib/utils'
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
 function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string }) {
   return (
@@ -94,6 +114,7 @@ function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string })
           <path d="M30 47 H108" stroke={accent} strokeWidth="2" strokeOpacity="0.6" />
         </g>
       )}
+<<<<<<< HEAD
       {variant === 'icebreaker' && (
         <g>
           <path d="M18 38 H120 L112 50 Q70 55 30 50 Z" fill="#4d6068" />
@@ -111,6 +132,8 @@ function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string })
           <path d="M10 49 l6 -3 3 4 -6 3 Z" fill="#cfe9ea" fillOpacity="0.4" />
         </g>
       )}
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
     </svg>
   )
 }
@@ -174,6 +197,7 @@ export function ShipyardDialog() {
   const equipBoat = useGameStore((s) => s.equipBoat)
   const equipRod = useGameStore((s) => s.equipRod)
   const toggleDecoration = useGameStore((s) => s.toggleDecoration)
+<<<<<<< HEAD
   const ownedFacilities = useGameStore((s) => s.ownedFacilities)
   const installedFacilities = useGameStore((s) => s.installedFacilities)
   const facilityActive = useGameStore((s) => s.facilityActive)
@@ -197,6 +221,10 @@ export function ShipyardDialog() {
     installFacility(emptySlot, id)
   }
   const previewStyle = BOAT_STYLES.find((style) => style.id === selectedBoat) ?? BOAT_STYLES[0]
+=======
+
+  const close = () => setShopOpen(false)
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>
@@ -248,6 +276,7 @@ export function ShipyardDialog() {
               鱼竿
               <span className="tnum text-[9px] text-foam/35">{ROD_SKINS.length}</span>
             </TabsTrigger>
+<<<<<<< HEAD
             <TabsTrigger value="facilities" className="flex-1 gap-1.5">
               <Wrench className="size-3.5" />
               设施
@@ -259,10 +288,17 @@ export function ShipyardDialog() {
               <Sparkles className="size-3.5" />
               装饰
               <span className="tnum hidden text-[9px] text-foam/35 sm:inline">{DECORATIONS.length}</span>
+=======
+            <TabsTrigger value="decor" className="flex-1 gap-1.5">
+              <Sparkles className="size-3.5" />
+              装饰
+              <span className="tnum text-[9px] text-foam/35">{DECORATIONS.length}</span>
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="boats" className="mt-2.5">
+<<<<<<< HEAD
             <div className="max-h-[min(68dvh,610px)] overflow-y-auto pr-0.5">
               <div className="mb-2.5 overflow-hidden rounded-xl border border-border/50 bg-[radial-gradient(ellipse_at_50%_0%,rgba(93,216,201,0.16),rgba(7,27,29,0.55))]">
                 <div className="flex items-start justify-between gap-2 px-3 pt-2">
@@ -315,10 +351,14 @@ export function ShipyardDialog() {
               </div>
 
               <div className="grid grid-cols-1 gap-2.5 pb-0.5 sm:grid-cols-2">
+=======
+            <div className="grid max-h-[min(56dvh,430px)] grid-cols-1 gap-2.5 overflow-y-auto pr-0.5 sm:grid-cols-2">
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
               {BOAT_STYLES.map((style) => {
                 const owned = ownedItems.includes(style.id)
                 const equipped = boatSkin === style.id
                 const affordable = money >= style.price
+<<<<<<< HEAD
                 const selected = selectedBoat === style.id
                 return (
                   <div
@@ -328,6 +368,14 @@ export function ShipyardDialog() {
                     className={cn(
                       'cursor-pointer overflow-hidden rounded-xl border bg-card/40 transition-colors',
                       equipped ? 'border-gold/55' : selected ? 'border-tide/55' : 'border-border/50',
+=======
+                return (
+                  <div
+                    key={style.id}
+                    className={cn(
+                      'overflow-hidden rounded-xl border bg-card/40',
+                      equipped ? 'border-gold/55' : 'border-border/50',
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
                     )}
                   >
                     <div className="relative h-[96px] bg-[radial-gradient(ellipse_at_50%_25%,rgba(93,216,201,0.12),rgba(7,27,29,0.2))] px-2 pt-1">
@@ -353,12 +401,15 @@ export function ShipyardDialog() {
                       <p className="line-clamp-2 min-h-[28px] text-[10.5px] leading-relaxed text-muted-foreground">
                         {style.tagline}
                       </p>
+<<<<<<< HEAD
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[8.5px] text-foam/35">
                         <span>{style.classLabel} · 第{style.tier}级</span>
                         <span>载重 {style.capacity}</span>
                         <span>设施槽 {style.facilitySlots}</span>
                         <span>耐久 {style.durability}</span>
                       </div>
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
                       <div className="mt-0.5 flex items-center justify-between gap-2">
                         <span
                           className={cn(
@@ -395,7 +446,10 @@ export function ShipyardDialog() {
                   </div>
                 )
               })}
+<<<<<<< HEAD
               </div>
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
             </div>
           </TabsContent>
 
@@ -471,6 +525,7 @@ export function ShipyardDialog() {
             </div>
           </TabsContent>
 
+<<<<<<< HEAD
           <TabsContent value="facilities" className="mt-2.5">
             <div className="max-h-[min(64dvh,570px)] space-y-2.5 overflow-y-auto pr-0.5">
               <div className="flex items-center justify-between rounded-lg border border-border/45 bg-abyss/30 px-3 py-2">
@@ -670,6 +725,8 @@ export function ShipyardDialog() {
             </div>
           </TabsContent>
 
+=======
+>>>>>>> d49125042e280aa62183c07294f8b20bed463f3a
           <TabsContent value="decor" className="mt-2.5">
             <div className="grid max-h-[min(56dvh,430px)] grid-cols-1 gap-2 overflow-y-auto pr-0.5 sm:grid-cols-2">
               {DECORATIONS.map((deco) => {
