@@ -27,6 +27,9 @@ import { LightningOverlay } from '@/components/LightningOverlay'
 import { AchievementToast } from '@/components/AchievementToast'
 import { AchievementsPanel } from '@/components/AchievementsPanel'
 import { CrewPanel } from '@/components/CrewPanel'
+import { PlayerSkinShop } from '@/components/PlayerSkinShop'
+import { DragonRaceHud } from '@/components/DragonRaceHud'
+import { CrewCatchNotice } from '@/components/CrewCatchNotice'
 import { SeaEventHud } from '@/components/SeaEventHud'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
@@ -60,6 +63,8 @@ export default function App() {
           <Toasts />
           <AchievementToast />
           <SeaEventHud />
+          <DragonRaceHud />
+          <CrewCatchNotice />
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (
@@ -84,6 +89,7 @@ export default function App() {
       <LightningOverlay />
       <AchievementsPanel />
       <CrewPanel />
+      <PlayerSkinShop />
 
       <AnimatePresence>
         {!started && <IntroScreen onStart={() => undefined} />}

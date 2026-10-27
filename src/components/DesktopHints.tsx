@@ -3,12 +3,14 @@ import { useGameStore } from '@/store/useGameStore'
 
 const HINTS = [
   { keys: ['W', 'A', 'S', 'D'], label: '划船' },
+  { keys: ['Shift'], label: '加速冲刺' },
   { keys: ['Space'], label: '蓄力 / 抛竿' },
   { keys: ['按住', 'Space'], label: '收线' },
   { keys: ['F'], label: '抽动假饵' },
   { keys: ['E'], label: '码头卖鱼' },
   { keys: ['G'], label: '回小镇' },
-  { keys: ['B'], label: '鱼篓' },
+  { keys: ['I'], label: '鱼篓' },
+  { keys: ['B'], label: '皮肤商店' },
   { keys: ['R'], label: '鱼饵' },
   { keys: ['T'], label: '季节' },
   { keys: ['V'], label: '潜入水下' },

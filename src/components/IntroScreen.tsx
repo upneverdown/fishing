@@ -10,8 +10,10 @@ const DESKTOP_CONTROLS = [
   { keys: 'W A S D', text: '划船穿行海湾' },
   { keys: '空格', text: '按住蓄力 · 松手抛竿' },
   { keys: '按住空格', text: '咬钩后收线' },
-  { keys: 'E / B', text: '码头卖鱼 / 查看鱼篓' },
+  { keys: 'E / I', text: '码头卖鱼 / 查看鱼篓' },
+  { keys: 'Shift', text: '按住加速冲刺 · 船尾激起浪花' },
   { keys: 'R / T', text: '切换鱼饵 / 四季' },
+  { keys: 'B / K', text: '皮肤商店 / 船员名册' },
   { keys: 'V / F', text: '潜入水下 / 切换视角' },
 ]
 

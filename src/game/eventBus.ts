@@ -7,6 +7,10 @@ export interface GameEventMap {
   'boat:sailed': { meters: number; skin: BoatSkinId }
   'catch:junk': { defId: string; speed: number }
   'chest:opened': { id: string; reward: string }
+  'dragonboat:start': { at: number }
+  'dragonboat:finish': { secondsLeft: number }
+  'crew:catch': { crewName: string; fishName: string; coins: number }
+  'boat:collide': { power: number }
 }
 
 type Handler<T> = (payload: T) => void

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { mulberry32 } from '@/game/utils/math'
 import { SPOTS, depthAt, terrainHeight } from './worldMap'
+import type { ColliderSink } from './colliders'
 
 const woodLight = new THREE.MeshStandardMaterial({ color: '#a97a4b', roughness: 0.92, flatShading: true })
 const woodDark = new THREE.MeshStandardMaterial({ color: '#6d4a2d', roughness: 0.95, flatShading: true })
@@ -50,7 +51,7 @@ function makeSignTexture() {
   return texture
 }
 
-export function createDock(): THREE.Group {
+export function createDock(colliders?: ColliderSink): THREE.Group {
   const group = new THREE.Group()
 
   const deckY = 1.12
@@ -142,6 +143,11 @@ export function createDock(): THREE.Group {
   plate.castShadow = true
   group.add(plate)
 
+  if (colliders) {
+    colliders.addBox(-1.2, 5.2, startZ - 0.6, startZ + 16 * 1.04 + 0.6)
+    colliders.addBox(-0.6, 4.6, 47.1, 52.2)
+  }
+
   return group
 }
 
@@ -210,7 +216,7 @@ export function createForest(): { group: THREE.Group; foliage: THREE.InstancedMe
   return { group, foliage }
 }
 
-export function createRocks(): THREE.Group {
+export function createRocks(colliders?: ColliderSink): THREE.Group {
   const group = new THREE.Group()
   const rand = mulberry32(778899)
   const geo = new THREE.DodecahedronGeometry(1, 0)
@@ -242,6 +248,9 @@ export function createRocks(): THREE.Group {
     color.set(rand() > 0.5 ? '#7e877c' : '#6a746b')
     color.offsetHSL(0, 0, (rand() - 0.5) * 0.08)
     mesh.setColorAt(count, color)
+    if (colliders && h > -0.9 && Math.hypot(x - 2, z - 17) > 11) {
+      colliders.addCircle(x, z, s * 0.9 + 0.25)
+    }
     count++
   }
   mesh.count = count
@@ -259,6 +268,7 @@ export function createRocks(): THREE.Group {
     islet.add(rock)
   }
   group.add(islet)
+  if (colliders) colliders.addCircle(15.4, 7, 3.9)
 
   return group
 }

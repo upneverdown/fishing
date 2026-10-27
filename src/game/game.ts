@@ -14,6 +14,10 @@ import { AchievementManager } from '@/game/achievements/achievementManager'
 import { CrewSystem } from '@/game/crew/crewSystem'
 import { SeaEvents } from '@/game/events/seaEvents'
 import { TreasureSystem } from '@/game/treasures/treasureSystem'
+import { WakeSpray } from '@/game/fx/wakeSpray'
+import { PlayerAvatar } from '@/game/player/playerAvatar'
+import { playerSkinById } from '@/game/player/playerSkins'
+import { DragonBoatRace, DRAGON_RACE_TIME } from '@/game/race/dragonBoatRace'
 import {
   crewDamageMul,
   crewOxygenMul,
@@ -70,6 +74,9 @@ export class Game {
   readonly crewSystem: CrewSystem
   readonly seaEvents: SeaEvents
   readonly treasures: TreasureSystem
+  readonly avatar: PlayerAvatar
+  readonly wakeSpray: WakeSpray
+  readonly dragonRace: DragonBoatRace
 
   private raf = 0
   private disposed = false
@@ -174,7 +181,14 @@ export class Game {
   private appliedRod = ''
   private appliedDecorations = ''
   private appliedSeason: SeasonId | '' = ''
+  private appliedPlayerSkin = ''
   private lastUnderwater = false
+  private autoLockedBossId = ''
+  private raceSyncTimer = 0
+  private lastHitAt = 0
+  private impactToastTimer = 0
+  private combatFaceTarget = new THREE.Vector3()
+  private combatHasTarget = false
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -202,6 +216,23 @@ export class Game {
     this.crewSystem = new CrewSystem(this.boat)
     this.seaEvents = new SeaEvents(this.scene, this.world, this.boat)
     this.treasures = new TreasureSystem(this.scene, this.world, this.boat)
+    this.avatar = new PlayerAvatar(this.scene)
+    this.wakeSpray = new WakeSpray()
+    this.scene.add(this.wakeSpray.points)
+    this.dragonRace = new DragonBoatRace(this.scene, (event, secondsLeft) => {
+      const state = useGameStore.getState()
+      if (event === 'start') {
+        state.toast(`龙舟赛开始 · ${DRAGON_RACE_TIME} 秒内穿过全部光圈`, 'gold')
+        return
+      }
+      if (event === 'finish') {
+        state.completeDragonBoatRace(secondsLeft)
+        gameEvents.emit('dragonboat:finish', { secondsLeft })
+        return
+      }
+      state.toast('龙舟赛超时 · 回到起点再试一次', 'danger')
+    })
+    this.boat.setAnglerVisible(false)
     this.post = new UnderwaterPost()
 
     this.scene.add(this.camera)
@@ -527,6 +558,12 @@ export class Game {
       this.boat.setDecorations(store.decorations)
       this.appliedDecorations = decoKey
     }
+    if (store.playerSkin !== this.appliedPlayerSkin) {
+      const firstSync = this.appliedPlayerSkin === ''
+      this.avatar.setSkin(store.playerSkin)
+      this.appliedPlayerSkin = store.playerSkin
+      if (!firstSync) store.toast(`已换上 ${playerSkinById(store.playerSkin).name}`, 'gold')
+    }
   }
 
   private syncSeason(store: ReturnType<typeof useGameStore.getState>, immediate = false) {
@@ -621,6 +658,9 @@ export class Game {
       this.leaves.update(time, dt, this.boat.position)
       this.seasonFx.update(time, dt, this.boat.position)
       this.crewSystem.update(dt, time)
+      this.avatar.update(dt, this.boat, false, null)
+      this.wakeSpray.update(dt)
+      this.dragonRace.update(dt, time, 9999, 9999)
       this.updateCamera(dt, false)
       return
     }
@@ -635,6 +675,10 @@ export class Game {
     if (store.respawnToken !== this.lastRespawnToken) {
       this.lastRespawnToken = store.respawnToken
       this.resetToDock()
+    }
+    if (store.hitAt !== this.lastHitAt) {
+      this.lastHitAt = store.hitAt
+      if (store.hitAt > 0) this.avatar.hit()
     }
 
     if (store.underwater) {
@@ -652,13 +696,14 @@ export class Game {
     let steer = input.steer
     if (!allowMove) throttle = 0
     if (modal || locked || fishingBusy || anchored) steer = 0
+    const boost = input.boost && allowMove && !store.underwater
 
     this.boatSafe.copy(this.boat.position)
     const prevX = this.boat.position.x
     const prevZ = this.boat.position.z
     const prevHeading = this.boat.heading
 
-    this.boat.update(dt, time, this.world, throttle, steer, allowMove)
+    this.boat.update(dt, time, this.world, throttle, steer, allowMove, boost)
     this.boat.setNight(
       SEASONS[store.season].period === 'night' || this.world.stormStrength > 0.45,
     )
@@ -684,6 +729,38 @@ export class Game {
       }
     }
     this.crewSystem.update(dt, time)
+
+    const bossTarget = store.boss && !store.underwater
+      ? this.creatures.bossPosition(store.boss.id, this.combatFaceTarget)
+      : null
+    this.combatHasTarget = Boolean(bossTarget)
+    this.avatar.group.visible = !store.underwater
+    this.avatar.update(dt, this.boat, allowMove && Math.abs(this.boat.speed) > 0.6, bossTarget)
+
+    if (store.boss && !store.combatCamera && !this.autoLockedBossId) {
+      const pos = this.creatures.bossPosition(store.boss.id, this.combatFaceTarget)
+      if (pos) {
+        const distance = Math.hypot(this.boat.position.x - pos.x, this.boat.position.z - pos.z)
+        if (distance < 44) {
+          this.autoLockedBossId = store.boss.id
+          store.setCombatCamera(true)
+          store.toast('进入战斗 · 镜头已锁定首领', 'info')
+        }
+      }
+    }
+    if (!store.boss) this.autoLockedBossId = ''
+
+    const impact = this.boat.consumeImpact()
+    this.impactToastTimer = Math.max(0, this.impactToastTimer - dt)
+    if (impact > 0.3) {
+      this.world.foam.wake(this.boat.position.x, this.boat.position.z, 1.2 + impact * 0.8)
+      if (this.impactToastTimer <= 0) {
+        this.impactToastTimer = 1.4
+        store.toast('撞上障碍物 · 船身被弹开', 'danger')
+      }
+      gameEvents.emit('boat:collide', { power: impact })
+    }
+
     this.seaEvents.update(dt, time, {
       canSpawn:
         allowMove &&
@@ -782,6 +859,46 @@ export class Game {
       this.rippleTimer = 0.48
     }
 
+    this.boat.getStern(this.stern)
+    this.boat.getForward(this.forward)
+    this.right.set(-this.forward.z, 0, this.forward.x)
+    if (!modal && !locked && allowMove) {
+      this.wakeSpray.emit(
+        this.stern,
+        this.forward,
+        this.right,
+        Math.abs(this.boat.speed),
+        this.boat.boostActive,
+        dt,
+      )
+    }
+    this.wakeSpray.update(dt)
+
+    this.dragonRace.update(dt, time, this.boat.position.x, this.boat.position.z)
+    this.raceSyncTimer -= dt
+    if (this.raceSyncTimer <= 0) {
+      this.raceSyncTimer = 0.12
+      const hud = this.dragonRace.active || store.dragonRace
+        ? {
+            active: this.dragonRace.active,
+            passed: this.dragonRace.passed,
+            total: this.dragonRace.total,
+            timeLeft: Math.ceil(this.dragonRace.timeLeft),
+            best: useGameStore.getState().dragonRaceBest,
+          }
+        : null
+      const prev = store.dragonRace
+      const changed =
+        (!hud && prev) ||
+        (hud &&
+          (!prev ||
+            prev.active !== hud.active ||
+            prev.passed !== hud.passed ||
+            prev.timeLeft !== hud.timeLeft ||
+            prev.best !== hud.best))
+      if (changed) store.setDragonRace(hud)
+    }
+
     this.updateWeapon(dt, store, modal, fishingBusy)
     this.updateSearchlight(store)
     this.updateTrawl(dt, store, time)
@@ -804,6 +921,7 @@ export class Game {
     input.clear()
     input.setLookEnabled(true)
     useGameStore.getState().setCombatCamera(false)
+    this.avatar.group.visible = false
     gameEvents.emit('underwater:enter', { at: Date.now() })
 
     const fwd = this.boat.getForward(this.forward)
@@ -841,6 +959,7 @@ export class Game {
     this.seasonFx.setVisible(true)
     this.leaves.setVisible(true)
     this.oxygenValue = 100
+    this.avatar.group.visible = true
     useGameStore.getState().setCaptureTarget(null)
     this.treasures.clearPrompt()
     this.camPos.copy(this.camera.position)
@@ -1113,17 +1232,21 @@ export class Game {
     } else if (store.combatCamera && store.boss && !store.underwater) {
       const bossPos = this.creatures.bossPosition(store.boss.id, this.combatTarget)
       if (bossPos) {
-        const dx = this.boat.position.x - bossPos.x
-        const dz = this.boat.position.z - bossPos.z
-        const len = Math.max(8, Math.hypot(dx, dz))
+        // Over-the-shoulder rig: sit behind the avatar, offset to the right, and look at the boss.
+        const head = this.avatar.getHeadPosition(this.combatFaceTarget)
+        const dx = head.x - bossPos.x
+        const dz = head.z - bossPos.z
+        const len = Math.max(6, Math.hypot(dx, dz))
         const nx = dx / len
         const nz = dz / len
-        const backDist = 11 + Math.min(10, len * 0.24) + Math.max(0, this.boat.cameraScale - 1) * 5
-        const side = 1.5 * this.boat.cameraScale
+        const shoulder = 0.9 + Math.max(0, this.boat.cameraScale - 1) * 1.2
+        const sideX = -nz
+        const sideZ = nx
+        const backDist = 4.4 + Math.min(3.4, len * 0.05) + Math.max(0, this.boat.cameraScale - 1) * 3
         this.desired.set(
-          this.boat.position.x + nx * backDist - nz * side,
-          this.boat.position.y + 8.2 + Math.min(4.4, len * 0.09),
-          this.boat.position.z + nz * backDist + nx * side,
+          head.x + nx * backDist + sideX * shoulder,
+          head.y + 1.35 + Math.min(2.6, len * 0.05),
+          head.z + nz * backDist + sideZ * shoulder,
         )
         this.lookTarget.copy(bossPos)
         this.lookTarget.y += 2.2 + Math.min(2.2, len * 0.04)
@@ -1298,8 +1421,9 @@ export class Game {
       store.started && !modal && !store.dead && !fishingBusy && !store.underwater
         ? true
         : store.started && !modal && !store.dead && store.underwater
-    this.weaponRig.visible = active
-    if (!active) return
+    const thirdPerson = store.combatCamera && Boolean(store.boss) && !store.underwater
+    this.weaponRig.visible = active && !thirdPerson
+    if (!active || thirdPerson) return
 
     const isGun = store.equippedWeapon === 'speargun'
     this.knifeModel.visible = !isGun
@@ -1608,14 +1732,22 @@ export class Game {
     if (store.equippedWeapon !== 'knife') store.equipWeapon('knife')
     this.weaponCooldown = def.cooldown
     this.attackAnim = 0.28
+    this.avatar.slash()
     this.camera.getWorldDirection(this.viewDir)
     const isOnBoat = !store.underwater
     const origin = isOnBoat ? this.boat.position.clone() : this.camera.position.clone()
     if (isOnBoat) {
-      // Horizontal aim so the blade sweeps along the water surface from the deck.
-      this.viewDir.y = 0
-      this.viewDir.normalize()
-      origin.y += 0.4
+      if (this.combatHasTarget) {
+        this.avatar.getHeadPosition(origin)
+        this.viewDir.copy(this.combatFaceTarget).sub(origin)
+        this.viewDir.y = Math.max(-0.05, this.viewDir.y * 0.25)
+        this.viewDir.normalize()
+      } else {
+        // Horizontal aim so the blade sweeps along the water surface from the deck.
+        this.viewDir.y = 0
+        this.viewDir.normalize()
+        origin.y += 0.4
+      }
     }
     const range = isOnBoat ? def.range + 4.6 : def.range
     const damage = Math.round(def.damage * crewDamageMul(store.crew))
@@ -1640,9 +1772,16 @@ export class Game {
     if (!store.consumeAmmo('speargun')) return
     this.weaponCooldown = def.cooldown
     this.attackAnim = 0.28
+    this.avatar.slash()
     this.camera.getWorldDirection(this.viewDir)
     const isOnBoat = !store.underwater
     const origin = this.camera.position.clone()
+    if (isOnBoat && this.combatHasTarget) {
+      this.avatar.getHeadPosition(origin)
+      this.viewDir.copy(this.combatFaceTarget).sub(origin)
+      this.viewDir.y = Math.max(-0.02, this.viewDir.y * 0.3)
+      this.viewDir.normalize()
+    }
     const damage = Math.round(def.damage * crewDamageMul(store.crew))
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
@@ -1740,6 +1879,14 @@ export class Game {
       }
     }
 
+    if (input.consumeSkin()) {
+      if (this.fishing.phase === 'idle') {
+        store.setSkinShopOpen(true)
+      } else {
+        store.toast('先收线，再进皮肤商店', 'info')
+      }
+    }
+
     if (input.consumeDive()) {
       if (store.boss) {
         store.toggleCombatCamera()
@@ -1826,6 +1973,10 @@ export class Game {
 
     if (input.consumeTown()) {
       store.toast('先浮回水面，再回码头', 'info')
+    }
+
+    if (input.consumeSkin()) {
+      store.toast('先浮回水面，再进皮肤商店', 'info')
     }
 
     if (input.consumeDive()) {
@@ -2200,6 +2351,9 @@ export class Game {
     this.crewSystem.dispose()
     this.seaEvents.dispose()
     this.treasures.dispose()
+    this.avatar.dispose()
+    this.wakeSpray.dispose()
+    this.dragonRace.dispose()
     this.achievements.dispose()
     this.post.dispose()
     this.seasonFx.dispose()

@@ -19,6 +19,7 @@ import {
 import { Foam } from '@/game/fx/foam'
 import { createSky } from './sky'
 import { SEASONS, type SeasonProfile } from './seasons'
+import { CollisionWorld } from './colliders'
 import type { SeasonId } from '@/types'
 
 interface SeasonLook {
@@ -142,6 +143,7 @@ function lightningTexture() {
 export class World {
   readonly water: Water
   readonly foam: Foam
+  readonly colliders = new CollisionWorld()
 
   private buoys: Buoy[]
   private waterfallMaterial: THREE.ShaderMaterial
@@ -194,11 +196,11 @@ export class World {
     this.water.setFogRange(scene.fog.near, scene.fog.far)
     scene.add(this.water.mesh)
 
-    scene.add(createDock())
+    scene.add(createDock(this.colliders))
     const forest = createForest()
     scene.add(forest.group)
     this.foliage = forest.foliage
-    scene.add(createRocks())
+    scene.add(createRocks(this.colliders))
     const lilies = createLilies()
     scene.add(lilies.group)
     this.lilies = lilies.mesh

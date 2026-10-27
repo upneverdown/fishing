@@ -197,6 +197,7 @@ export function ShipyardDialog() {
     installFacility(emptySlot, id)
   }
   const previewStyle = BOAT_STYLES.find((style) => style.id === selectedBoat) ?? BOAT_STYLES[0]
+  const visibleBoatStyles = BOAT_STYLES.filter((style) => !style.hidden)
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>
@@ -241,7 +242,7 @@ export function ShipyardDialog() {
             <TabsTrigger value="boats" className="flex-1 gap-1.5">
               <Ship className="size-3.5" />
               船体
-              <span className="tnum text-[9px] text-foam/35">{BOAT_STYLES.length}</span>
+              <span className="tnum text-[9px] text-foam/35">{visibleBoatStyles.length}</span>
             </TabsTrigger>
             <TabsTrigger value="rods" className="flex-1 gap-1.5">
               <Anchor className="size-3.5" />
@@ -315,7 +316,7 @@ export function ShipyardDialog() {
               </div>
 
               <div className="grid grid-cols-1 gap-2.5 pb-0.5 sm:grid-cols-2">
-              {BOAT_STYLES.map((style) => {
+              {visibleBoatStyles.map((style) => {
                 const owned = ownedItems.includes(style.id)
                 const equipped = boatSkin === style.id
                 const affordable = money >= style.price

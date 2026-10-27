@@ -30,6 +30,9 @@ export class AchievementManager {
       gameEvents.on('chest:opened', () => {
         this.advance('treasure_hunter', 1)
       }),
+      gameEvents.on('dragonboat:finish', () => {
+        this.advance('dragon_boat', 1)
+      }),
     ]
   }
 

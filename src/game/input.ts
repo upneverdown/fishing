@@ -14,6 +14,7 @@ class InputController {
   private interactPress = false
   private bagPress = false
   private shopPress = false
+  private skinPress = false
   private divePress = false
   private baitPress = false
   private seasonPress = false
@@ -110,7 +111,8 @@ class InputController {
     }
     if (e.repeat) return
     if (key === 'e') this.interactPress = true
-    if (key === 'b') this.bagPress = true
+    if (key === 'i') this.bagPress = true
+    if (key === 'b') this.skinPress = true
     if (key === 'c') this.shopPress = true
     if (key === 'v') this.divePress = true
     if (key === 'r') this.baitPress = true
@@ -199,6 +201,12 @@ class InputController {
   consumeShop() {
     const pressed = this.shopPress
     this.shopPress = false
+    return pressed
+  }
+
+  consumeSkin() {
+    const pressed = this.skinPress
+    this.skinPress = false
     return pressed
   }
 
@@ -317,12 +325,20 @@ class InputController {
     return this.keys.has('control') || this.touchSprint
   }
 
+  get boost() {
+    return this.keys.has('shift') || this.touchSprint
+  }
+
   tapInteract() {
     this.interactPress = true
   }
 
   tapBag() {
     this.bagPress = true
+  }
+
+  tapSkin() {
+    this.skinPress = true
   }
 
   tapCapture() {
@@ -369,6 +385,7 @@ class InputController {
     this.interactPress = false
     this.bagPress = false
     this.shopPress = false
+    this.skinPress = false
     this.divePress = false
     this.baitPress = false
     this.seasonPress = false
@@ -401,6 +418,7 @@ class InputController {
     this.interactPress = false
     this.bagPress = false
     this.shopPress = false
+    this.skinPress = false
     this.divePress = false
     this.baitPress = false
     this.seasonPress = false

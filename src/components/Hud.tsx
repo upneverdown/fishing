@@ -9,6 +9,7 @@ import {
   Leaf,
   MapPinned,
   ScanEye,
+  Shirt,
   Ship,
   Trophy,
   Users,
@@ -185,6 +186,7 @@ export function Hud() {
   const baitId = useGameStore((s) => s.baitId)
   const baitWear = useGameStore((s) => s.baitWear)
   const setBagOpen = useGameStore((s) => s.setBagOpen)
+  const setSkinShopOpen = useGameStore((s) => s.setSkinShopOpen)
   const setShopOpen = useGameStore((s) => s.setShopOpen)
   const setTownOpen = useGameStore((s) => s.setTownOpen)
   const setBaitOpen = useGameStore((s) => s.setBaitOpen)
@@ -215,6 +217,14 @@ export function Hud() {
       return
     }
     setShopOpen(true)
+  }
+
+  const openSkinShop = () => {
+    if (phase !== 'idle') {
+      toast('先收线，再进皮肤商店')
+      return
+    }
+    setSkinShopOpen(true)
   }
 
   const openBait = () => {
@@ -366,6 +376,15 @@ export function Hud() {
           >
             <Ship className="size-4" />
           </button>
+          <button
+            type="button"
+            onClick={openSkinShop}
+            className="glass pointer-events-auto grid size-9 place-items-center rounded-full text-foam/70 transition-colors hover:border-gold/40 hover:text-gold active:translate-y-px"
+            aria-label="打开皮肤商店"
+            title="皮肤商店 (B)"
+          >
+            <Shirt className="size-4" />
+          </button>
           <MuteButton />
           <button
             type="button"
@@ -385,6 +404,12 @@ export function Hud() {
               <span className="flex items-center gap-1.5">
                 <span className="rounded border border-foam/20 bg-foam/10 px-1.5 py-0.5 text-[10px] font-semibold text-foam/70">
                   B
+                </span>
+                <span className="text-[11px] text-foam/60">皮肤</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="rounded border border-foam/20 bg-foam/10 px-1.5 py-0.5 text-[10px] font-semibold text-foam/70">
+                  I
                 </span>
                 <span className="text-[11px] text-foam/60">鱼篓</span>
               </span>

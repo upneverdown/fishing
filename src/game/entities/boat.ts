@@ -147,6 +147,35 @@ const pirateLanternMat = new THREE.MeshStandardMaterial({
   emissiveIntensity: 1.8,
   roughness: 0.35,
 })
+const dragonHullMat = new THREE.MeshStandardMaterial({
+  color: '#a32f28',
+  roughness: 0.6,
+  metalness: 0.08,
+  flatShading: true,
+})
+const dragonTrimMat = new THREE.MeshStandardMaterial({
+  color: '#e8b955',
+  roughness: 0.36,
+  metalness: 0.55,
+  flatShading: true,
+})
+const dragonDeckMat = new THREE.MeshStandardMaterial({
+  color: '#5d2a22',
+  roughness: 0.92,
+  flatShading: true,
+})
+const dragonScaleMat = new THREE.MeshStandardMaterial({
+  color: '#2f7d5a',
+  roughness: 0.5,
+  metalness: 0.24,
+  flatShading: true,
+})
+const dragonEyeMat = new THREE.MeshStandardMaterial({
+  color: '#ffe9a3',
+  emissive: '#ffb02e',
+  emissiveIntensity: 2.1,
+  roughness: 0.3,
+})
 
 function tatteredSail(width: number, height: number) {
   const shape = new THREE.Shape()
@@ -264,6 +293,18 @@ const LAYOUTS: Record<BoatSkinId, BoatLayout> = {
     garland: { x: 1.22, y: 0.98, zFrom: -2.35, zTo: 2.55 },
     shadow: [4.0, 8.0],
   },
+  dragonboat: {
+    angler: [0, 0.2, 1.4],
+    rod: [0.44, 1.02, -0.2],
+    creel: [-0.52, 0.72, 1.72],
+    creelVisible: true,
+    lantern: [0, 1.28, 2.9],
+    flag: [0, 0.94, 2.44],
+    figurehead: [0, 0.72, -3.4],
+    crate: [0.54, 0.68, 1.86],
+    garland: { x: 0.94, y: 0.86, zFrom: -2.2, zTo: 2.2 },
+    shadow: [3.4, 7.4],
+  },
 }
 
 export class Boat {
@@ -312,6 +353,10 @@ export class Boat {
   private camScale = 1
   private hullHalfWidth = 0
   private hullHalfLength = 0
+  private collisionHalfWidth = 0.58
+  private collisionHalfLength = 1.5
+  private impactPower = 0
+  boostActive = false
   private builtSkin: BoatSkinId | null = null
   private night = false
   private pirateLanternLight: THREE.PointLight | null = null
@@ -352,12 +397,24 @@ export class Boat {
       submarine: { bob: 0.48, accel: 1.0 },
       icebreaker: { bob: 0.42, accel: 0.78 },
       pirate: { bob: 0.86, accel: 0.72 },
+      dragonboat: { bob: 0.58, accel: 1.28 },
     }[style.id]
     this.bobMul = feel.bob
     this.accelMul = feel.accel
-    this.camScale = style.id === 'pirate' ? 1.36 : 1
-    this.hullHalfWidth = style.id === 'pirate' ? 1.42 : 0
-    this.hullHalfLength = style.id === 'pirate' ? 3.15 : 0
+    this.camScale = style.id === 'pirate' ? 1.36 : style.id === 'dragonboat' ? 1.18 : 1
+    this.hullHalfWidth = style.id === 'pirate' ? 1.42 : style.id === 'dragonboat' ? 1.2 : 0
+    this.hullHalfLength = style.id === 'pirate' ? 3.15 : style.id === 'dragonboat' ? 3.15 : 0
+    const hullSize = {
+      rowboat: [1.5, 0.58],
+      speedboat: [1.8, 0.62],
+      patrol: [2.3, 0.82],
+      submarine: [1.9, 0.62],
+      icebreaker: [2.5, 0.9],
+      pirate: [3.15, 1.42],
+      dragonboat: [3.15, 1.2],
+    }[style.id]
+    this.collisionHalfLength = hullSize[0]
+    this.collisionHalfWidth = hullSize[1]
     this.crewDeck = {
       rowboat: { y: 0.14, halfWidth: 0.4, halfLength: 0.95, crewZ: [-1.35, -0.2] as [number, number] },
       speedboat: { y: 0.5, halfWidth: 0.48, halfLength: 1.1, crewZ: [-0.85, 0.85] as [number, number] },
@@ -365,6 +422,7 @@ export class Boat {
       submarine: { y: 0.84, halfWidth: 0.48, halfLength: 1.2, crewZ: [-0.9, 0.9] as [number, number] },
       icebreaker: { y: 0.7, halfWidth: 0.78, halfLength: 1.85, crewZ: [-1.4, 1.4] as [number, number] },
       pirate: { y: 0.78, halfWidth: 0.92, halfLength: 2.2, crewZ: [-1.75, 1.75] as [number, number] },
+      dragonboat: { y: 0.5, halfWidth: 0.7, halfLength: 1.85, crewZ: [-1.5, 1.5] as [number, number] },
     }[style.id]
 
     if (this.builtSkin !== style.id) {
@@ -412,7 +470,162 @@ export class Boat {
     else if (id === 'patrol') this.buildPatrolBoat()
     else if (id === 'icebreaker') this.buildIcebreaker()
     else if (id === 'submarine') this.buildSubmarine()
+    else if (id === 'dragonboat') this.buildDragonBoat()
     else this.buildPirateShip()
+  }
+
+  private buildDragonBoat() {
+    const shape = new THREE.Shape()
+    shape.moveTo(0, 3.4)
+    shape.bezierCurveTo(0.78, 2.7, 1.12, 1.0, 1.14, -1.4)
+    shape.quadraticCurveTo(1.14, -2.75, 0.72, -3.1)
+    shape.lineTo(-0.72, -3.1)
+    shape.quadraticCurveTo(-1.14, -2.75, -1.14, -1.4)
+    shape.bezierCurveTo(-1.12, 1.0, -0.78, 2.7, 0, 3.4)
+
+    const hullGeo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.86,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: 0.06,
+      bevelSegments: 2,
+      curveSegments: 20,
+      steps: 1,
+    })
+    hullGeo.rotateX(-Math.PI / 2)
+    const hull = new THREE.Mesh(hullGeo, dragonHullMat)
+    hull.position.y = -0.3
+    hull.castShadow = true
+    hull.receiveShadow = true
+    this.hullGroup.add(hull)
+
+    const rimShape = new THREE.Shape(shape.getPoints(32))
+    const hole = shape
+      .getPoints(32)
+      .map((p) => new THREE.Vector2(p.x * 0.9, p.y * 0.93))
+      .reverse()
+    rimShape.holes.push(new THREE.Path(hole))
+    const rimGeo = new THREE.ExtrudeGeometry(rimShape, {
+      depth: 0.1,
+      bevelEnabled: false,
+      curveSegments: 28,
+    })
+    rimGeo.rotateX(-Math.PI / 2)
+    const rim = new THREE.Mesh(rimGeo, dragonTrimMat)
+    rim.position.y = 0.56
+    rim.castShadow = true
+    this.hullGroup.add(rim)
+
+    const deckGeo = new THREE.ShapeGeometry(shape, 20)
+    deckGeo.scale(0.82, 0.88, 1)
+    deckGeo.rotateX(-Math.PI / 2)
+    const deck = new THREE.Mesh(deckGeo, dragonDeckMat)
+    deck.position.y = 0.5
+    deck.receiveShadow = true
+    this.hullGroup.add(deck)
+
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 9; i++) {
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.5), dragonTrimMat)
+        stripe.position.set(side * 1.02, 0.48, -2.5 + i * 0.62)
+        stripe.rotation.z = side * 0.08
+        this.hullGroup.add(stripe)
+      }
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 4.9), dragonTrimMat)
+      rail.position.set(side * 1.0, 0.68, 0.05)
+      this.hullGroup.add(rail)
+      const oar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 2.4), postMat)
+      oar.position.set(side * 1.16, 0.28, 0.3)
+      oar.rotation.z = side * 0.24
+      oar.rotation.y = side * 0.12
+      this.hullGroup.add(oar)
+    }
+
+    const stern = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.42, 0.8), dragonDeckMat)
+    stern.position.set(0, 0.68, 2.55)
+    this.hullGroup.add(stern)
+    const sternTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 0.9), dragonTrimMat)
+    sternTop.position.set(0, 0.92, 2.55)
+    this.hullGroup.add(sternTop)
+
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.32, 14), dragonTrimMat)
+    drum.rotation.x = Math.PI / 2
+    drum.position.set(0, 1.0, 1.95)
+    drum.castShadow = true
+    this.hullGroup.add(drum)
+    const drumSkin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.29, 0.29, 0.02, 14),
+      new THREE.MeshStandardMaterial({ color: '#efe0c2', roughness: 0.9 }),
+    )
+    drumSkin.rotation.x = Math.PI / 2
+    drumSkin.position.set(0, 1.0, 2.12)
+    this.hullGroup.add(drumSkin)
+    for (const side of [-1, 1]) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.46, 5), postMat)
+      stick.position.set(side * 0.2, 1.24, 1.9)
+      stick.rotation.z = side * 0.4
+      this.hullGroup.add(stick)
+    }
+
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.4, 6), postMat)
+    mast.position.set(0, 1.9, -0.9)
+    mast.castShadow = true
+    this.hullGroup.add(mast)
+    const banner = new THREE.Mesh(tatteredSail(1.5, 1.9), flagMat)
+    banner.position.set(0, 3.28, -0.86)
+    banner.castShadow = true
+    this.hullGroup.add(banner)
+    const pennant = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.9, 4), dragonTrimMat)
+    pennant.position.set(0, 3.78, -0.9)
+    pennant.rotation.z = Math.PI / 2
+    this.hullGroup.add(pennant)
+
+    const dragon = new THREE.Group()
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 1.2, 8), dragonScaleMat)
+    neck.position.set(0, 0.62, -0.12)
+    neck.rotation.x = -0.34
+    dragon.add(neck)
+    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), dragonScaleMat)
+    head.scale.set(1, 0.86, 1.24)
+    head.position.set(0, 1.16, -0.42)
+    dragon.add(head)
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 0.5), dragonScaleMat)
+    snout.position.set(0, 1.06, -0.78)
+    dragon.add(snout)
+    const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.36), dragonHullMat)
+    jaw.position.set(0, 0.94, -0.76)
+    jaw.rotation.x = 0.16
+    dragon.add(jaw)
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), dragonEyeMat)
+      eye.position.set(side * 0.19, 1.26, -0.62)
+      dragon.add(eye)
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.38, 5), dragonTrimMat)
+      horn.position.set(side * 0.16, 1.5, -0.24)
+      horn.rotation.x = 0.5
+      horn.rotation.z = side * 0.22
+      dragon.add(horn)
+      const whisker = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.6, 4), dragonTrimMat)
+      whisker.position.set(side * 0.28, 1.04, -0.96)
+      whisker.rotation.z = side * 0.5
+      whisker.rotation.x = Math.PI / 2
+      dragon.add(whisker)
+    }
+    const mane = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.6, 6), flagMat)
+    mane.position.set(0, 1.52, -0.18)
+    mane.rotation.x = -0.3
+    dragon.add(mane)
+    dragon.position.set(0, 0.5, -2.72)
+    dragon.scale.setScalar(1.16)
+    dragon.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) obj.castShadow = true
+    })
+    this.hullGroup.add(dragon)
+
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.24, 1.0, 6), dragonScaleMat)
+    tail.position.set(0, 0.72, 3.18)
+    tail.rotation.x = -1.15
+    this.hullGroup.add(tail)
   }
 
   private buildPirateShip() {
@@ -1378,6 +1591,29 @@ export class Boat {
     return this.crewDeck
   }
 
+  get skin() {
+    return this.skinId
+  }
+
+  get collisionHalfExtents() {
+    return { width: this.collisionHalfWidth, length: this.collisionHalfLength }
+  }
+
+  setAnglerVisible(visible: boolean) {
+    this.anglerGroup.visible = visible
+  }
+
+  consumeImpact() {
+    const power = this.impactPower
+    this.impactPower = 0
+    return power
+  }
+
+  getPlayerSpot(out = new THREE.Vector3()) {
+    this.group.updateMatrixWorld()
+    return this.anglerGroup.getWorldPosition(out)
+  }
+
   getForward(out = new THREE.Vector3()) {
     return out.set(-Math.sin(this.heading), 0, -Math.cos(this.heading))
   }
@@ -1394,6 +1630,17 @@ export class Boat {
 
   private canOccupy(x: number, z: number, world: World) {
     if (world.depthAt(x, z) <= 0.9) return false
+    if (
+      world.colliders.boatBlocked(
+        x,
+        z,
+        this.heading,
+        this.collisionHalfLength,
+        this.collisionHalfWidth,
+      )
+    ) {
+      return false
+    }
     if (this.hullHalfLength <= 0) return true
     const fx = -Math.sin(this.heading)
     const fz = -Math.cos(this.heading)
@@ -1418,13 +1665,21 @@ export class Boat {
     throttle: number,
     steer: number,
     allowMove: boolean,
+    boost = false,
   ) {
     const canDrive = allowMove
+    this.boostActive = canDrive && boost && throttle > 0.1 && this.speed > 0.35
+    let blockedHard = false
     if (canDrive) {
       const speedBoost = this.crewSpeedMul * this.stormSpeedMul
-      this.speed += throttle * 7.2 * this.speedMul * this.accelMul * speedBoost * dt
+      const boostMul = this.boostActive ? 1.5 : 1
+      this.speed += throttle * 7.2 * this.speedMul * this.accelMul * speedBoost * boostMul * dt
       this.speed *= Math.exp(-(Math.abs(throttle) < 0.05 ? 1.15 : 0.45) * dt)
-      this.speed = clamp(this.speed, -2.7 * this.stormSpeedMul, 7.4 * this.speedMul * speedBoost)
+      this.speed = clamp(
+        this.speed,
+        -2.7 * this.stormSpeedMul,
+        7.4 * this.speedMul * speedBoost * boostMul,
+      )
 
       const speedFactor = 0.34 + Math.min(Math.abs(this.speed) / (6.2 * this.speedMul), 1) * 0.9
       const direction = this.speed < -0.15 ? -1 : 1
@@ -1439,17 +1694,31 @@ export class Boat {
       if (this.canOccupy(nextX, nextZ, world)) {
         this.position.x = nextX
         this.position.z = nextZ
-      } else if (this.canOccupy(this.position.x + forward.x * step, this.position.z, world)) {
+      } else if (
+        Math.abs(forward.x * step) > 1e-4 &&
+        this.canOccupy(this.position.x + forward.x * step, this.position.z, world)
+      ) {
         this.position.x += forward.x * step
         this.speed *= 0.55
-      } else if (this.canOccupy(this.position.x, this.position.z + forward.z * step, world)) {
+      } else if (
+        Math.abs(forward.z * step) > 1e-4 &&
+        this.canOccupy(this.position.x, this.position.z + forward.z * step, world)
+      ) {
         this.position.z += forward.z * step
         this.speed *= 0.55
       } else {
+        blockedHard = Math.abs(this.speed) > 0.8
+        if (blockedHard) {
+          this.impactPower = Math.max(
+            this.impactPower,
+            Math.min(1, Math.abs(this.speed) * 0.8 + 0.35),
+          )
+        }
         this.speed *= -0.22
       }
     } else {
       this.speed *= Math.exp(-4.5 * dt)
+      this.boostActive = false
     }
 
     const wave = world.waveHeight(this.position.x, this.position.z, time)

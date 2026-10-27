@@ -94,6 +94,17 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: 600,
     icon: 'chest',
   },
+  {
+    id: 'dragon_boat',
+    name: '龙舟舵手',
+    desc: '在 60 秒内穿过龙舟赛道的全部光圈',
+    category: 'vehicle',
+    target: 1,
+    unit: '次',
+    reward: 1000,
+    icon: 'ship',
+    hidden: true,
+  },
 ]
 
 const ACHIEVEMENT_MAP = new Map(ACHIEVEMENTS.map((a) => [a.id, a]))

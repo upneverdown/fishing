@@ -117,6 +117,12 @@ import {
   type AchievementProgress,
 } from '@/game/achievements/catalog'
 import { CREW, crewById } from '@/game/crew/crew'
+import {
+  PLAYER_SKINS,
+  isPlayerSkin,
+  playerSkinById,
+  type PlayerSkinId,
+} from '@/game/player/playerSkins'
 
 export const BAG_CAPACITY = 10
 export const MAX_HP = 100
@@ -166,6 +172,19 @@ export interface StoreStats {
   soldValue: number
 }
 
+export interface DragonRaceHud {
+  active: boolean
+  passed: number
+  total: number
+  timeLeft: number
+  best: number
+}
+
+export interface CrewCatchNote {
+  id: number
+  text: string
+}
+
 interface PersistedProgress {
   money: number
   bag: Catch[]
@@ -210,6 +229,9 @@ interface PersistedProgress {
   achievements: AchievementMap
   crew: string[]
   relics: string[]
+  ownedPlayerSkins: PlayerSkinId[]
+  playerSkin: PlayerSkinId
+  dragonRaceBest: number
 }
 
 interface GameStore extends PersistedProgress {
@@ -258,6 +280,9 @@ interface GameStore extends PersistedProgress {
   crewOpen: boolean
   seaEvent: SeaEventHud | null
   chestPrompt: string | null
+  skinShopOpen: boolean
+  dragonRace: DragonRaceHud | null
+  crewCatchNote: CrewCatchNote | null
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -361,6 +386,12 @@ interface GameStore extends PersistedProgress {
   addRelic: (name: string) => void
   setSeaEvent: (event: SeaEventHud | null) => void
   setChestPrompt: (text: string | null) => void
+  setSkinShopOpen: (open: boolean) => void
+  buyPlayerSkin: (id: PlayerSkinId) => boolean
+  equipPlayerSkin: (id: PlayerSkinId) => void
+  setDragonRace: (race: DragonRaceHud | null) => void
+  completeDragonBoatRace: (secondsLeft: number) => void
+  showCrewCatch: (text: string) => void
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
   resetProgress: () => void
@@ -551,6 +582,17 @@ function readSave(): Partial<PersistedProgress> {
     out.crew = sanitizeCrew(p.crew)
     if (Array.isArray(p.relics)) {
       out.relics = p.relics.filter((v): v is string => typeof v === 'string').slice(0, 40)
+    }
+    if (Array.isArray(p.ownedPlayerSkins)) {
+      const owned = p.ownedPlayerSkins.filter(isPlayerSkin)
+      out.ownedPlayerSkins = Array.from(new Set<PlayerSkinId>(['angler', ...owned]))
+    }
+    const savedSkin = p.playerSkin
+    if (typeof savedSkin === 'string' && isPlayerSkin(savedSkin) && out.ownedPlayerSkins?.includes(savedSkin)) {
+      out.playerSkin = savedSkin
+    }
+    if (typeof p.dragonRaceBest === 'number') {
+      out.dragonRaceBest = Math.max(0, Math.min(999, Math.round(p.dragonRaceBest)))
     }
     return out
   } catch {
@@ -743,6 +785,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
   const achievements = sanitizeAchievements(saved.achievements)
   const crew = sanitizeCrew(saved.crew)
   const relics = saved.relics ?? []
+  const ownedPlayerSkins = saved.ownedPlayerSkins ?? ['angler']
+  const playerSkin = saved.playerSkin ?? 'angler'
+  const dragonRaceBest = saved.dragonRaceBest ?? 0
 
   const persist = () => {
     const {
@@ -789,6 +834,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
       achievements,
       crew,
       relics,
+      ownedPlayerSkins,
+      playerSkin,
+      dragonRaceBest,
     } = get()
     try {
       localStorage.setItem(
@@ -837,6 +885,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
           achievements,
           crew,
           relics,
+          ownedPlayerSkins,
+          playerSkin,
+          dragonRaceBest,
         }),
       )
     } catch {
@@ -915,6 +966,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     achievements,
     crew,
     relics,
+    ownedPlayerSkins,
+    playerSkin,
+    dragonRaceBest,
 
     started: false,
     phase: 'idle',
@@ -961,6 +1015,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     crewOpen: false,
     seaEvent: null,
     chestPrompt: null,
+    skinShopOpen: false,
+    dragonRace: null,
+    crewCatchNote: null,
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -2373,6 +2430,86 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setSeaEvent: (seaEvent) => set({ seaEvent }),
     setChestPrompt: (chestPrompt) => set({ chestPrompt }),
 
+    setSkinShopOpen: (open) => set({ skinShopOpen: open }),
+
+    buyPlayerSkin: (id) => {
+      const def = playerSkinById(id)
+      const state = get()
+      if (!def) return false
+      if (state.ownedPlayerSkins.includes(id)) {
+        state.toast(`${def.name} 已经在衣柜里了`)
+        return false
+      }
+      if (state.money < def.price) {
+        state.toast(`购买 ${def.name} 需要 ¥${def.price}`, 'danger')
+        return false
+      }
+      set({
+        money: state.money - def.price,
+        ownedPlayerSkins: [...state.ownedPlayerSkins, id],
+        playerSkin: id,
+      })
+      state.toast(`已购入 ${def.name} · 立即穿戴`, 'gold')
+      persist()
+      return true
+    },
+
+    equipPlayerSkin: (id) => {
+      const def = playerSkinById(id)
+      const state = get()
+      if (!def) return
+      if (!state.ownedPlayerSkins.includes(id)) {
+        state.toast(`还没有 ${def.name}，先购买吧`, 'danger')
+        return
+      }
+      if (state.playerSkin === id) {
+        state.toast(`已经穿着 ${def.name} 了`)
+        return
+      }
+      set({ playerSkin: id })
+      state.toast(`换上 ${def.name}`, 'gold')
+      persist()
+    },
+
+    setDragonRace: (dragonRace) => set({ dragonRace }),
+
+    completeDragonBoatRace: (secondsLeft) => {
+      const state = get()
+      const timeBonus = Math.max(0, Math.round(secondsLeft)) * 10
+      const reward = 600 + timeBonus
+      const firstClear = !state.ownedItems.includes('dragonboat')
+      const already = state.dragonRaceBest > 0
+      set({
+        money: state.money + reward,
+        totalEarned: state.totalEarned + reward,
+        stats: { ...state.stats, soldValue: state.stats.soldValue + reward },
+        ownedItems: firstClear ? [...state.ownedItems, 'dragonboat'] : state.ownedItems,
+        boatSkin: firstClear ? 'dragonboat' : state.boatSkin,
+        installedFacilities: firstClear
+          ? resizeInstalled(state.installedFacilities, 'dragonboat')
+          : state.installedFacilities,
+        dragonRaceBest: Math.max(state.dragonRaceBest, Math.max(0, Math.round(secondsLeft))),
+      })
+      state.toast(
+        firstClear
+          ? `龙舟赛通关 · +¥${reward} · 解锁龙吟号并自动换乘`
+          : already
+            ? `龙舟赛再次通关 · +¥${reward}`
+            : `龙舟赛通关 · +¥${reward}`,
+        'gold',
+      )
+      persist()
+    },
+
+    showCrewCatch: (text) => {
+      toastSeq += 1
+      const id = toastSeq
+      set({ crewCatchNote: { id, text } })
+      window.setTimeout(() => {
+        if (get().crewCatchNote?.id === id) set({ crewCatchNote: null })
+      }, 4200)
+    },
+
     toast: (text, tone = 'info') => {
       toastSeq += 1
       const id = toastSeq
@@ -2461,11 +2598,17 @@ export const useGameStore = create<GameStore>()((set, get) => {
         achievements: emptyAchievements(),
         crew: [],
         relics: [],
+        ownedPlayerSkins: ['angler'],
+        playerSkin: 'angler',
+        dragonRaceBest: 0,
         achievementsOpen: false,
         achievementToast: null,
         crewOpen: false,
         seaEvent: null,
         chestPrompt: null,
+        skinShopOpen: false,
+        dragonRace: null,
+        crewCatchNote: null,
       })
       persist()
     },
@@ -2491,6 +2634,7 @@ export function isModalOpen(state: GameStore = useGameStore.getState()) {
       state.captureResult ||
       state.achievementsOpen ||
       state.crewOpen ||
+      state.skinShopOpen ||
       state.dead,
   )
 }

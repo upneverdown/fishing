@@ -2,15 +2,24 @@ import * as THREE from 'three'
 import type { Boat } from '@/game/entities/boat'
 import { crewById, type CrewDef } from '@/game/crew/crew'
 import { useGameStore } from '@/store/useGameStore'
+import { createCatch, pickFish } from '@/game/fishing/fishTable'
+import { gameEvents } from '@/game/eventBus'
+
+const FISHING_INTERVAL = 300
+const CAST_DURATION = 9
 
 interface Figure {
   def: CrewDef
   group: THREE.Group
+  rod: THREE.Group
   targetX: number
   targetZ: number
   wait: number
   phase: number
   facing: number
+  state: 'idle' | 'fishing'
+  timer: number
+  cast: number
 }
 
 /** Low-poly crew that wanders the deck of whichever hull is equipped. */
@@ -81,6 +90,30 @@ export class CrewSystem {
     group.add(body)
     group.scale.setScalar(index === 0 ? 1 : 0.95)
 
+    const rod = new THREE.Group()
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.022, 0.95, 5),
+      new THREE.MeshStandardMaterial({ color: '#7a5a34', roughness: 0.9, flatShading: true }),
+    )
+    pole.position.y = 0.45
+    rod.add(pole)
+    const line = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.004, 0.004, 1.5, 3),
+      new THREE.MeshBasicMaterial({ color: '#cfe9e4', transparent: true, opacity: 0.55 }),
+    )
+    line.position.y = -0.75
+    rod.add(line)
+    const float = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 6, 5),
+      new THREE.MeshStandardMaterial({ color: '#e3554a', emissive: '#8a2a22', emissiveIntensity: 0.5 }),
+    )
+    float.position.y = -1.5
+    rod.add(float)
+    rod.position.set(0.24, 0.7, -0.12)
+    rod.rotation.z = -0.65
+    rod.visible = false
+    group.add(rod)
+
     const deck = this.boat.deck
     const [zMin, zMax] = deck.crewZ
     group.position.set(
@@ -116,14 +149,19 @@ export class CrewSystem {
       if (!def) return
       const deck = this.boat.deck
       const [zMin, zMax] = deck.crewZ
+      const built = this.build(def, index)
       this.figures.set(id, {
         def,
-        group: this.build(def, index),
+        group: built,
+        rod: built.children[1] as THREE.Group,
         targetX: (Math.random() - 0.5) * deck.halfWidth * 0.85,
         targetZ: zMin + Math.random() * (zMax - zMin),
         wait: 1 + Math.random() * 3,
         phase: Math.random() * Math.PI * 2,
         facing: Math.random() * Math.PI * 2,
+        state: 'idle',
+        timer: FISHING_INTERVAL + index * 24 + Math.random() * 20,
+        cast: 0,
       })
     })
   }
@@ -134,9 +172,22 @@ export class CrewSystem {
     for (const fig of this.figures.values()) {
       const group = fig.group
       const torso = group.children[0] as THREE.Group
-      fig.wait -= dt
 
-      if (fig.wait <= 0) {
+      if (fig.state === 'idle') {
+        fig.timer -= dt
+        if (fig.timer <= 0) {
+          fig.state = 'fishing'
+          fig.cast = CAST_DURATION
+          fig.wait = 999
+          fig.rod.visible = true
+          const side = Math.random() > 0.5 ? 1 : -1
+          fig.targetX = side * deck.halfWidth * 0.92
+          fig.targetZ = deck.crewZ[0] + Math.random() * (deck.crewZ[1] - deck.crewZ[0])
+        }
+      }
+
+      fig.wait -= dt
+      if (fig.state === 'idle' && fig.wait <= 0) {
         const [zMin, zMax] = deck.crewZ
         fig.targetX = (Math.random() - 0.5) * deck.halfWidth * 0.9
         fig.targetZ = zMin + Math.random() * (zMax - zMin)
@@ -148,7 +199,7 @@ export class CrewSystem {
       const distance = Math.hypot(dx, dz)
       const walking = distance > 0.16
       if (walking) {
-        const step = Math.min(distance, dt * 0.48)
+        const step = Math.min(distance, dt * (fig.state === 'fishing' ? 0.7 : 0.48))
         group.position.x += (dx / distance) * step
         group.position.z += (dz / distance) * step
         fig.facing = Math.atan2(dx, dz)
@@ -161,11 +212,43 @@ export class CrewSystem {
       group.rotation.y += turn * Math.min(1, dt * 4)
       group.position.y = deck.y + (walking ? Math.abs(Math.sin(time * 6 + fig.phase)) * 0.035 : 0)
       torso.rotation.z = walking ? Math.sin(time * 6 + fig.phase) * 0.06 : 0
-      torso.rotation.x = walking ? 0.05 : Math.sin(time * 1.3 + fig.phase) * 0.02
+      torso.rotation.x = walking
+        ? 0.05
+        : fig.state === 'fishing'
+          ? 0.1
+          : Math.sin(time * 1.3 + fig.phase) * 0.02
       if (!walking) {
         torso.position.y = Math.sin(time * 1.5 + fig.phase) * 0.012
       }
+
+      if (fig.state === 'fishing') {
+        fig.cast -= dt
+        fig.rod.rotation.x = -0.1 + Math.sin(time * 2.2 + fig.phase) * 0.05
+        if (fig.cast <= 0) {
+          fig.state = 'idle'
+          fig.timer = FISHING_INTERVAL
+          fig.wait = 1.5
+          fig.rod.visible = false
+          this.landCatch(fig)
+        }
+      }
     }
+  }
+
+  private landCatch(fig: Figure) {
+    const state = useGameStore.getState()
+    const def = pickFish(2.4, { season: state.season })
+    const caught = createCatch(def, 'rod')
+    const added = state.addCatch(caught)
+    state.grantMoney(20, `船员 ${fig.def.name} 的渔获分成`)
+    state.showCrewCatch(
+      `船员[${fig.def.name}]为你钓上了一条[${def.name}]，获得金币+20${added ? '' : '（鱼篓已满，鱼放回了海里）'}`,
+    )
+    gameEvents.emit('crew:catch', {
+      crewName: fig.def.name,
+      fishName: def.name,
+      coins: 20,
+    })
   }
 
   dispose() {

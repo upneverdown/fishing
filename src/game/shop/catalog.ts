@@ -1,6 +1,13 @@
 import type { WaterId } from '@/types'
 
-export type BoatSkinId = 'rowboat' | 'speedboat' | 'patrol' | 'submarine' | 'icebreaker' | 'pirate'
+export type BoatSkinId =
+  | 'rowboat'
+  | 'speedboat'
+  | 'patrol'
+  | 'submarine'
+  | 'icebreaker'
+  | 'pirate'
+  | 'dragonboat'
 export type RodSkinId = 'classic' | 'tide' | 'ember' | 'aurora'
 export type DecorationId = 'figurehead' | 'garland' | 'flag' | 'crate'
 
@@ -23,6 +30,7 @@ export interface BoatStyle {
   durability: number
   weatherproof: boolean
   waters: WaterId[]
+  hidden?: boolean
 }
 
 export interface RodSkin {
@@ -154,6 +162,25 @@ export const BOAT_STYLES: BoatStyle[] = [
     durability: 320,
     weatherproof: true,
     waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+  },
+  {
+    id: 'dragonboat',
+    name: '龙吟号',
+    title: '龙舟',
+    tagline: '赤漆船身、鎏金龙首，鼓点一响整片海湾都跟着发烫。',
+    price: 0,
+    speed: 1.3,
+    turn: 0.96,
+    accent: '#e3554a',
+    tier: 4,
+    classLabel: '龙舟',
+    capacity: 24,
+    gearCap: 3,
+    facilitySlots: 3,
+    durability: 180,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+    hidden: true,
   },
 ]
 
