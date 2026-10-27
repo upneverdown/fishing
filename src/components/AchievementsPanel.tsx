@@ -42,7 +42,7 @@ export function AchievementsPanel() {
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key.toLowerCase() === 'j') setOpen(false)
+      if (event.key === 'Escape' || event.key.toLowerCase() === 'n') setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

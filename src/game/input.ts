@@ -26,6 +26,8 @@ class InputController {
   private lightPress = false
   private grillPress = false
   private variantPress = false
+  private skillWaterPress = false
+  private skillSwordPress = false
   private achievementsPress = false
   private crewPress = false
   private slotPress = 0
@@ -115,18 +117,20 @@ class InputController {
     if (key === 'b') this.skinPress = true
     if (key === 'c') this.shopPress = true
     if (key === 'v') this.divePress = true
-    if (key === 'r') this.baitPress = true
+    if (key === 'x') this.baitPress = true
     if (key === 't') this.seasonPress = true
     if (key === 'f') this.toolPress = true
     if (key === 'g') this.townPress = true
-    if (key === 'z') this.knifePress = true
-    if (key === 'x') this.gunPress = true
+    if (key === 'j') this.knifePress = true
+    if (key === 'k') this.gunPress = true
     if (key === 'y') this.anchorPress = true
     if (key === 'l') this.lightPress = true
     if (key === 'h') this.grillPress = true
-    if (key === 'q') this.variantPress = true
-    if (key === 'j') this.achievementsPress = true
-    if (key === 'k') this.crewPress = true
+    if (key === 'z') this.variantPress = true
+    if (key === 'q') this.skillWaterPress = true
+    if (key === 'r') this.skillSwordPress = true
+    if (key === 'n') this.achievementsPress = true
+    if (key === 'm') this.crewPress = true
     if (key === '1') this.slotPress = 1
     if (key === '2') this.slotPress = 2
     if (key === '3') this.slotPress = 3
@@ -282,6 +286,18 @@ class InputController {
     return pressed
   }
 
+  consumeSkillWater() {
+    const pressed = this.skillWaterPress
+    this.skillWaterPress = false
+    return pressed
+  }
+
+  consumeSkillSword() {
+    const pressed = this.skillSwordPress
+    this.skillSwordPress = false
+    return pressed
+  }
+
   consumeAchievements() {
     const pressed = this.achievementsPress
     this.achievementsPress = false
@@ -397,6 +413,8 @@ class InputController {
     this.lightPress = false
     this.grillPress = false
     this.variantPress = false
+    this.skillWaterPress = false
+    this.skillSwordPress = false
     this.achievementsPress = false
     this.crewPress = false
     this.slotPress = 0
@@ -430,6 +448,8 @@ class InputController {
     this.lightPress = false
     this.grillPress = false
     this.variantPress = false
+    this.skillWaterPress = false
+    this.skillSwordPress = false
     this.achievementsPress = false
     this.crewPress = false
     this.slotPress = 0

@@ -8,7 +8,7 @@ import { SeasonFx } from '@/game/fx/seasonFx'
 import { UnderwaterWorld } from '@/game/underwater/underwaterWorld'
 import { UnderwaterPost } from '@/game/render/underwaterPost'
 import { input } from '@/game/input'
-import { MAX_HP, bagCapacity, isModalOpen, useGameStore } from '@/store/useGameStore'
+import { bagCapacity, isModalOpen, maxHpFor, useGameStore } from '@/store/useGameStore'
 import { gameEvents } from '@/game/eventBus'
 import { AchievementManager } from '@/game/achievements/achievementManager'
 import { CrewSystem } from '@/game/crew/crewSystem'
@@ -33,6 +33,8 @@ import {
 } from '@/game/capture/tools'
 import { variantById, variantStats } from '@/game/capture/variants'
 import { CreatureSystem } from '@/game/creatures/creatureSystem'
+import { CultivationManager, type CultivationPlayer } from '@/game/cultivation/cultivationManager'
+import { SKILLS, realmAttackMul, realmSpeedMul, skillUnlocked } from '@/game/cultivation/realms'
 import { CAMPFIRE_RADIUS, DockLife } from '@/game/world/dockLife'
 import { weaponById } from '@/game/combat/weapons'
 import { dayKey } from '@/game/economy/market'
@@ -68,6 +70,7 @@ export class Game {
   readonly seasonFx: SeasonFx
   readonly underwaterWorld: UnderwaterWorld
   readonly creatures: CreatureSystem
+  readonly cultivation: CultivationManager
   readonly dockLife: DockLife
   readonly post: UnderwaterPost
   readonly achievements = new AchievementManager()
@@ -122,6 +125,12 @@ export class Game {
   private bufferSize = new THREE.Vector2()
   private navTimer = 0
   private combatTarget = new THREE.Vector3()
+  private cultPlayer: CultivationPlayer = {
+    position: new THREE.Vector3(),
+    forward: new THREE.Vector3(),
+    busy: false,
+    underwater: false,
+  }
   private bubblePool = new THREE.Points(
     new THREE.BufferGeometry(),
     new THREE.PointsMaterial({
@@ -212,6 +221,7 @@ export class Game {
     this.seasonFx = new SeasonFx(this.scene)
     this.underwaterWorld = new UnderwaterWorld(this.scene, this.world)
     this.creatures = new CreatureSystem(this.scene, this.world)
+    this.cultivation = new CultivationManager(this.scene, this.world, this.creatures)
     this.dockLife = new DockLife(this.scene)
     this.crewSystem = new CrewSystem(this.boat)
     this.seaEvents = new SeaEvents(this.scene, this.world, this.boat)
@@ -639,10 +649,13 @@ export class Game {
   private update(dt: number, time: number) {
     const store = useGameStore.getState()
     this.boat.crewSpeedMul = crewSpeedMul(store.crew)
+    this.boat.realmSpeedMul = realmSpeedMul(store.realm)
     this.syncCosmetics(store)
     this.syncSeason(store)
     this.renderer.toneMappingExposure =
-      this.world.exposure * (1 - this.world.stormStrength * 0.42)
+      this.world.exposure *
+      (1 - this.world.stormStrength * 0.42) *
+      (1 - this.world.doomStrength * 0.22)
 
     if (store.underwater !== this.lastUnderwater) {
       if (store.underwater) this.enterUnderwater()
@@ -667,7 +680,9 @@ export class Game {
 
     const modal = isModalOpen(store)
     const locked = store.inputLocked
-    if (locked && !this.creatures.introActive) store.setInputLocked(false)
+    if (locked && !this.creatures.introActive && !this.cultivation.tribulating) {
+      store.setInputLocked(false)
+    }
 
     input.update()
     if (modal || locked) input.clearQueued()
@@ -683,6 +698,7 @@ export class Game {
 
     if (store.underwater) {
       this.updateUnderwater(dt, time, store, modal)
+      this.syncCultivation(dt, time, store, modal, false)
       return
     }
 
@@ -724,7 +740,7 @@ export class Game {
     this.repairTimer -= dt
     if (this.repairTimer <= 0) {
       this.repairTimer = 5
-      if (crewRepairsHull(store.crew) && !store.dead && store.hp < MAX_HP) {
+      if (crewRepairsHull(store.crew) && !store.dead && store.hp < maxHpFor(store.realm)) {
         store.healPlayer(2)
       }
     }
@@ -810,7 +826,7 @@ export class Game {
       store.pet.affection,
       this.boat.heading,
     )
-    if (!modal) {
+    if (!modal && !this.cultivation.tribulating) {
       this.creatures.update(dt, time, {
         position: this.boat.position,
         underwater: false,
@@ -821,6 +837,7 @@ export class Game {
         this.boat.position.z = this.boatSafe.z
       }
     }
+    this.syncCultivation(dt, time, store, modal, fishingBusy)
     this.world.update(time, dt, this.boat.position)
     this.world.updateFoam(dt)
     this.underwaterWorld.updateAmbient(time, dt, this.boat.position)
@@ -912,6 +929,26 @@ export class Game {
       this.handleActions(store, modal)
       this.handleCombat(store, modal)
     }
+  }
+
+  private syncCultivation(
+    dt: number,
+    time: number,
+    store: ReturnType<typeof useGameStore.getState>,
+    modal: boolean,
+    fishingBusy: boolean,
+  ) {
+    const player = this.cultPlayer
+    if (store.underwater) {
+      player.position.copy(this.swimPos)
+      this.boat.getForward(player.forward)
+    } else {
+      player.position.copy(this.boat.position)
+      this.boat.getForward(player.forward)
+    }
+    player.underwater = store.underwater
+    player.busy = modal || store.dead || store.inputLocked || fishingBusy
+    this.cultivation.update(dt, time, player)
   }
 
   private enterUnderwater() {
@@ -1015,7 +1052,7 @@ export class Game {
     this.repairTimer -= dt
     if (this.repairTimer <= 0) {
       this.repairTimer = 5
-      if (crewRepairsHull(store.crew) && !store.dead && store.hp < MAX_HP) {
+      if (crewRepairsHull(store.crew) && !store.dead && store.hp < maxHpFor(store.realm)) {
         store.healPlayer(2)
       }
     }
@@ -1267,6 +1304,12 @@ export class Game {
     }
 
     this.camera.position.copy(this.camPos)
+    const shake = this.cultivation.cameraShake
+    if (shake > 0.001) {
+      this.camera.position.x += (Math.random() - 0.5) * shake * 0.9
+      this.camera.position.y += (Math.random() - 0.5) * shake * 0.62
+      this.camera.position.z += (Math.random() - 0.5) * shake * 0.9
+    }
     this.camera.lookAt(this.camLook)
 
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
@@ -1301,6 +1344,15 @@ export class Game {
     const salvage = this.treasures.salvageInfo(boat)
     if (salvage) {
       return { kind: 'salvage' as const, id: null, prompt: salvage, label: '打捞' }
+    }
+    const core = this.cultivation.nearestCore(boat)
+    if (core) {
+      return {
+        kind: 'core' as const,
+        id: null,
+        prompt: `吸收${core.name} · 修为 +${core.xp}`,
+        label: '吸收',
+      }
     }
     const harvest = this.creatures.nearestHarvest(boat)
     if (harvest && harvest.distance < 20) {
@@ -1370,6 +1422,7 @@ export class Game {
 
   private resetToDock() {
     input.clear()
+    this.cultivation.abort()
     this.boat.position.set(SPAWN.x, 0, SPAWN.z)
     this.boat.heading = SPAWN.heading
     this.boat.speed = 0
@@ -1639,6 +1692,9 @@ export class Game {
     if (input.consumeKnife()) this.attackMelee()
     if (input.consumeGun()) this.attackRanged()
 
+    if (input.consumeSkillWater()) this.cultivation.castWater(this.cultPlayer)
+    if (input.consumeSkillSword()) this.cultivation.castSword(this.cultPlayer)
+
     if (input.consumeAnchor()) {
       if (!store.installedFacilities.includes('anchor')) {
         store.toast('船上还没有锚，去船坞装一个', 'info')
@@ -1750,7 +1806,7 @@ export class Game {
       }
     }
     const range = isOnBoat ? def.range + 4.6 : def.range
-    const damage = Math.round(def.damage * crewDamageMul(store.crew))
+    const damage = Math.round(def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm))
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
     this.seaEvents.strike(origin, this.viewDir, range, damage)
     if (isOnBoat && !hits) {
@@ -1782,7 +1838,7 @@ export class Game {
       this.viewDir.y = Math.max(-0.02, this.viewDir.y * 0.3)
       this.viewDir.normalize()
     }
-    const damage = Math.round(def.damage * crewDamageMul(store.crew))
+    const damage = Math.round(def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm))
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
     if (hit) {
@@ -1921,19 +1977,31 @@ export class Game {
       store.setCrewOpen(true)
     }
 
-    if (input.consumeTool() && this.fishing.phase === 'waiting') {
-      this.fishing.twitch()
+    if (input.consumeTool()) {
+      if (
+        !this.cultivation.absorbNearestCore(this.boat.position) &&
+        this.fishing.phase === 'waiting'
+      ) {
+        this.fishing.twitch()
+      }
     }
 
     if (input.consumeInteract()) {
       const info = this.resolveInteract(store)
-      if (!info) return
+      if (!info) {
+        if (skillUnlocked(SKILLS[1], store.realm)) this.cultivation.castFire(this.cultPlayer)
+        return
+      }
       if (info.kind === 'seaevent') {
         this.seaEvents.interact()
         return
       }
       if (info.kind === 'salvage') {
         this.treasures.salvageNearest(store)
+        return
+      }
+      if (info.kind === 'core') {
+        this.cultivation.absorbNearestCore(this.boat.position)
         return
       }
       if (info.kind === 'harvest' && info.id) {
@@ -2347,6 +2415,7 @@ export class Game {
     this.rope.geometry.dispose()
     ;(this.rope.material as THREE.Material).dispose()
     this.creatures.dispose()
+    this.cultivation.dispose()
     this.dockLife.dispose(this.scene)
     this.crewSystem.dispose()
     this.seaEvents.dispose()

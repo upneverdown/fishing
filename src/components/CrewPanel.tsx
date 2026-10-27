@@ -15,7 +15,7 @@ export function CrewPanel() {
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key.toLowerCase() === 'k') setOpen(false)
+      if (event.key === 'Escape' || event.key.toLowerCase() === 'm') setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

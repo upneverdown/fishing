@@ -123,9 +123,18 @@ import {
   playerSkinById,
   type PlayerSkinId,
 } from '@/game/player/playerSkins'
+import {
+  isRealmIndex,
+  playerMaxHp,
+  realmAt,
+  realmSuppressionMul,
+} from '@/game/cultivation/realms'
 
 export const BAG_CAPACITY = 10
 export const MAX_HP = 100
+export function maxHpFor(realm: number) {
+  return playerMaxHp(realm, MAX_HP)
+}
 export const UNDERWATER_MODES: UnderwaterMode[] = ['dive', 'follow', 'orbit']
 export const UNDERWATER_MODE_LABEL: Record<UnderwaterMode, string> = {
   dive: '自由潜游',
@@ -185,6 +194,28 @@ export interface CrewCatchNote {
   text: string
 }
 
+export type TribulationPhase = 'gathering' | 'striking' | 'burning' | 'ascended'
+
+export interface TribulationHud {
+  phase: TribulationPhase
+  bolt: number
+  totalBolts: number
+  fromName: string
+  toName: string
+  color: string
+}
+
+export interface SkillCdHud {
+  id: string
+  key: string
+  name: string
+  color: string
+  left: number
+  total: number
+  locked: boolean
+  needRealm: string
+}
+
 interface PersistedProgress {
   money: number
   bag: Catch[]
@@ -232,6 +263,9 @@ interface PersistedProgress {
   ownedPlayerSkins: PlayerSkinId[]
   playerSkin: PlayerSkinId
   dragonRaceBest: number
+  realm: number
+  cultivationXp: number
+  cultivationCores: number
 }
 
 interface GameStore extends PersistedProgress {
@@ -283,6 +317,8 @@ interface GameStore extends PersistedProgress {
   skinShopOpen: boolean
   dragonRace: DragonRaceHud | null
   crewCatchNote: CrewCatchNote | null
+  tribulation: TribulationHud | null
+  skillCds: SkillCdHud[]
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -392,6 +428,10 @@ interface GameStore extends PersistedProgress {
   setDragonRace: (race: DragonRaceHud | null) => void
   completeDragonBoatRace: (secondsLeft: number) => void
   showCrewCatch: (text: string) => void
+  absorbCore: (name: string, xp: number) => boolean
+  applyBreakthrough: () => { fromName: string; toName: string; realm: number } | null
+  setTribulation: (hud: TribulationHud | null) => void
+  setSkillCds: (cds: SkillCdHud[]) => void
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
   resetProgress: () => void
@@ -594,6 +634,13 @@ function readSave(): Partial<PersistedProgress> {
     if (typeof p.dragonRaceBest === 'number') {
       out.dragonRaceBest = Math.max(0, Math.min(999, Math.round(p.dragonRaceBest)))
     }
+    if (isRealmIndex(p.realm)) out.realm = p.realm
+    if (typeof p.cultivationXp === 'number' && Number.isFinite(p.cultivationXp)) {
+      out.cultivationXp = Math.max(0, Math.round(p.cultivationXp))
+    }
+    if (typeof p.cultivationCores === 'number' && Number.isFinite(p.cultivationCores)) {
+      out.cultivationCores = Math.max(0, Math.round(p.cultivationCores))
+    }
     return out
   } catch {
     return {}
@@ -765,7 +812,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
   const codexClaims = (saved.codexClaims ?? []).filter((n) =>
     (CODEX_MILESTONES as readonly number[]).includes(n),
   )
-  const initialHp = Math.round(clamp(num(saved.hp, MAX_HP), 1, MAX_HP))
+  const initialHp = Math.round(clamp(num(saved.hp, MAX_HP), 1, maxHpFor(saved.realm ?? 0)))
   const ownedWeapons = Array.from(
     new Set<WeaponId>(['knife', ...(saved.ownedWeapons ?? [])]),
   )
@@ -837,6 +884,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
       ownedPlayerSkins,
       playerSkin,
       dragonRaceBest,
+      realm,
+      cultivationXp,
+      cultivationCores,
     } = get()
     try {
       localStorage.setItem(
@@ -888,6 +938,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
           ownedPlayerSkins,
           playerSkin,
           dragonRaceBest,
+          realm,
+          cultivationXp,
+          cultivationCores,
         }),
       )
     } catch {
@@ -969,6 +1022,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     ownedPlayerSkins,
     playerSkin,
     dragonRaceBest,
+    realm: saved.realm ?? 0,
+    cultivationXp: saved.cultivationXp ?? 0,
+    cultivationCores: saved.cultivationCores ?? 0,
 
     started: false,
     phase: 'idle',
@@ -1018,6 +1074,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     skinShopOpen: false,
     dragonRace: null,
     crewCatchNote: null,
+    tribulation: null,
+    skillCds: [],
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -1983,7 +2041,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
       const state = get()
       if (state.dead) return false
       const armor = !state.underwater && state.boatSkin === 'pirate' ? 0.62 : 1
-      const dmg = Math.max(1, Math.round(amount * armor))
+      const pressure = state.boss ? realmSuppressionMul(state.realm, state.boss.realm ?? 0) : 1
+      const dmg = Math.max(1, Math.round(amount * armor * pressure))
       const hp = Math.max(0, state.hp - dmg)
       if (hp <= 0) {
         const lost = Math.floor(state.bag.length / 2)
@@ -2010,7 +2069,12 @@ export const useGameStore = create<GameStore>()((set, get) => {
         return true
       }
       set({ hp, hitAt: Date.now() })
-      state.toast(`${source}造成 ${dmg} 点伤害 · 生命 ${hp}/${MAX_HP}`, 'danger')
+      state.toast(
+        `${source}造成 ${dmg} 点伤害 · 生命 ${hp}/${maxHpFor(state.realm)}${
+          pressure < 1 ? ' · 境界压制生效' : pressure > 1 ? ' · 境界受压' : ''
+        }`,
+        'danger',
+      )
       persist()
       return true
     },
@@ -2018,7 +2082,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     healPlayer: (amount) => {
       const state = get()
       if (state.dead) return
-      const hp = clamp(state.hp + Math.max(0, Math.round(amount)), 0, MAX_HP)
+      const hp = clamp(state.hp + Math.max(0, Math.round(amount)), 0, maxHpFor(state.realm))
       if (hp === state.hp) return
       set({ hp })
       persist()
@@ -2029,7 +2093,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       if (!state.dead) return
       set({
         dead: false,
-        hp: MAX_HP,
+        hp: maxHpFor(state.realm),
         underwater: false,
         oxygen: 100,
         depth: 0,
@@ -2188,7 +2252,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         state.toast('船上还没有烤架', 'info')
         return false
       }
-      if (state.hp >= MAX_HP) {
+      if (state.hp >= maxHpFor(state.realm)) {
         state.toast('状态很好，不用急着吃')
         return false
       }
@@ -2199,7 +2263,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       }
       set({
         bag: state.bag.filter((c) => c.id !== fish.id),
-        hp: clamp(state.hp + 22, 0, MAX_HP),
+        hp: clamp(state.hp + 22, 0, maxHpFor(state.realm)),
         stats: { ...state.stats, cooked: state.stats.cooked + 1 },
       })
       state.toast(`烤掉了 ${fish.name} · 生命 +22`, 'gold')
@@ -2510,6 +2574,37 @@ export const useGameStore = create<GameStore>()((set, get) => {
       }, 4200)
     },
 
+    absorbCore: (name, xp) => {
+      const state = get()
+      const gained = Math.max(0, Math.round(xp))
+      const cultivationXp = state.cultivationXp + gained
+      set({ cultivationXp, cultivationCores: state.cultivationCores + 1 })
+      state.toast(`吸收${name} · 修为 +${gained}`, 'gold')
+      persist()
+      const need = realmAt(state.realm).requiredXp
+      return Number.isFinite(need) && cultivationXp >= need
+    },
+
+    applyBreakthrough: () => {
+      const state = get()
+      const from = realmAt(state.realm)
+      if (!Number.isFinite(from.requiredXp)) return null
+      const to = realmAt(state.realm + 1)
+      const nextRealm = state.realm + 1
+      set({
+        realm: nextRealm,
+        cultivationXp: Math.max(0, state.cultivationXp - from.requiredXp),
+        hp: maxHpFor(nextRealm),
+      })
+      state.toast(`恭喜道友，突破至${to.name}！`, 'gold')
+      persist()
+      return { fromName: from.name, toName: to.name, realm: nextRealm }
+    },
+
+    setTribulation: (tribulation) => set({ tribulation }),
+
+    setSkillCds: (skillCds) => set({ skillCds }),
+
     toast: (text, tone = 'info') => {
       toastSeq += 1
       const id = toastSeq
@@ -2560,6 +2655,11 @@ export const useGameStore = create<GameStore>()((set, get) => {
         gatherCooldowns: {},
         stats: { cooked: 0, harvested: 0, gathered: 0, soldValue: 0 },
         hp: MAX_HP,
+        realm: 0,
+        cultivationXp: 0,
+        cultivationCores: 0,
+        tribulation: null,
+        skillCds: [],
         ownedWeapons: ['knife'],
         equippedWeapon: 'knife',
         weaponAmmo: { knife: 0, speargun: 6 },

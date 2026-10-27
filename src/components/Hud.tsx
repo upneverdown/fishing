@@ -136,7 +136,7 @@ function UnderwaterBar() {
           onClick={() => setBaitOpen(true)}
           className="glass pointer-events-auto grid size-9 place-items-center rounded-full text-foam/70 transition-colors hover:border-tide/40 hover:text-tide active:translate-y-px"
           aria-label="打开饵盒"
-          title="饵盒 (R)"
+          title="饵盒 (X)"
         >
           <Fish className="size-4" />
         </button>
@@ -154,7 +154,7 @@ function UnderwaterBar() {
           onClick={toggleAchievements}
           className="glass pointer-events-auto grid size-9 place-items-center rounded-full text-foam/70 transition-colors hover:border-gold/40 hover:text-gold active:translate-y-px"
           aria-label="打开成就"
-          title="成就 (J)"
+          title="成就 (N)"
         >
           <Trophy className="size-4" />
         </button>
@@ -163,7 +163,7 @@ function UnderwaterBar() {
           onClick={() => setCrewOpen(true)}
           className="glass pointer-events-auto grid size-9 place-items-center rounded-full text-foam/70 transition-colors hover:border-tide/40 hover:text-tide active:translate-y-px"
           aria-label="打开船员名册"
-          title="船员 (K)"
+          title="船员名册 (M)"
         >
           <Users className="size-4" />
         </button>
@@ -315,7 +315,7 @@ export function Hud() {
               onClick={openBait}
               className="glass pointer-events-auto flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[10.5px] text-foam/75 transition-colors hover:border-tide/35 hover:text-foam active:translate-y-px"
               aria-label="打开饵盒"
-              title="鱼饵 (R)"
+              title="鱼饵 (X)"
             >
               <span
                 className="size-2 rounded-full"

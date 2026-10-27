@@ -110,6 +110,13 @@ const STORM_HEMI = new THREE.Color('#4b6a72')
 const STORM_SUN = new THREE.Color('#7d97a4')
 const FLASH_COLOR = new THREE.Color('#dff8ff')
 
+const DOOM_BG = new THREE.Color('#2a0b0d')
+const DOOM_FOG = new THREE.Color('#3c0f12')
+const DOOM_ZENITH = new THREE.Color('#160406')
+const DOOM_HORIZON = new THREE.Color('#6b1a1c')
+const DOOM_HEMI = new THREE.Color('#8a2c2a')
+const DOOM_SUN = new THREE.Color('#b0483a')
+
 function lightningTexture() {
   const canvas = document.createElement('canvas')
   canvas.width = 256
@@ -163,6 +170,8 @@ export class World {
   private lightningOffset = new THREE.Vector3()
   private storm = 0
   private stormTarget = 0
+  private doom = 0
+  private doomTarget = 0
 
   private seasonId: SeasonId = 'spring'
   private look: SeasonLook
@@ -306,6 +315,15 @@ export class World {
     this.stormTarget = THREE.MathUtils.clamp(strength, 0, 1)
   }
 
+  /** 渡劫时的压抑暗红天象 */
+  setDoom(amount: number) {
+    this.doomTarget = THREE.MathUtils.clamp(amount, 0, 1)
+  }
+
+  get doomStrength() {
+    return this.doom
+  }
+
   get stormStrength() {
     return this.storm
   }
@@ -427,6 +445,21 @@ export class World {
       this.fill.intensity *= 1 - s * 0.5
     }
 
+    if (this.doom > 0.004 && !this.underwater) {
+      const s = this.doom
+      background.lerp(DOOM_BG, s * 0.86)
+      fog.color.lerp(DOOM_FOG, s * 0.82)
+      const uniforms = this.sky.material.uniforms
+      ;(uniforms.uZenith.value as THREE.Color).lerp(DOOM_ZENITH, s * 0.9)
+      ;(uniforms.uHorizon.value as THREE.Color).lerp(DOOM_HORIZON, s * 0.88)
+      ;(uniforms.uSunColor.value as THREE.Color).lerp(DOOM_SUN, s * 0.8)
+      this.hemi.color.lerp(DOOM_HEMI, s * 0.75)
+      this.hemi.intensity *= 1 - s * 0.45
+      this.sun.color.lerp(DOOM_SUN, s * 0.8)
+      this.sun.intensity *= 1 - s * 0.6
+      this.fill.intensity *= 1 - s * 0.55
+    }
+
     if (this.lightningFlash > 0.01 && !this.underwater) {
       this.hemi.intensity += this.lightningFlash * 3.4
       this.sun.intensity += this.lightningFlash * 2.2
@@ -438,6 +471,7 @@ export class World {
   update(time: number, dt: number, center: THREE.Vector3) {
     this.time = time
     this.storm += (this.stormTarget - this.storm) * (1 - Math.exp(-dt * 1.7))
+    this.doom += (this.doomTarget - this.doom) * (1 - Math.exp(-dt * 2.6))
     this.lightningFlash = Math.max(0, this.lightningFlash - dt * 2.6)
     this.lerpLook(dt)
     this.applyScene(center)

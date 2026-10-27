@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { World } from '@/game/world/world'
 import type { RadarContact, WaterId } from '@/types'
 import { waterAt } from '@/game/world/waters'
+import { creatureRealm } from '@/game/cultivation/realms'
 import { useGameStore } from '@/store/useGameStore'
 import { audio } from '@/game/audio/gameAudio'
 import { gameEvents } from '@/game/eventBus'
@@ -310,6 +311,7 @@ export class CreatureSystem {
       phase: 1,
       skill: '龙王降临',
       ultimate: true,
+      realm: creatureRealm(dragon.kind),
     })
     store.toast('沉船深沟的水面开始翻涌 · 深渊龙王正在上浮', 'danger')
     store.flashSky()
@@ -1171,6 +1173,7 @@ export class CreatureSystem {
                 ? '龟壳防御'
                 : c.skillLabel,
           ultimate: Boolean(c.ultimate),
+          realm: creatureRealm(c.kind),
         })
       }
     } else if (this.lastBossId) {
@@ -1248,6 +1251,14 @@ export class CreatureSystem {
       name: c.name,
       ultimate: Boolean(c.ultimate),
     })
+    if (c.boss || c.kind === 'whale') {
+      gameEvents.emit('boss:core', {
+        kind: c.kind,
+        name: c.name,
+        x: c.group.position.x,
+        z: c.group.position.z,
+      })
+    }
   }
 
   nearestHarvest(origin: THREE.Vector3) {
@@ -1293,7 +1304,7 @@ export class CreatureSystem {
     c.respawnAt = this.clock * 1000 + 150_000
     const store = useGameStore.getState()
     store.grantMoney(value, `收割 ${c.name}`)
-    store.toast(`取下了 ${c.name} 的鳞甲与内丹 · +¥${value}`, 'gold')
+    store.toast(`取下了 ${c.name} 的鳞甲与筋腱 · +¥${value}`, 'gold')
     this.world.foam.splash(c.group.position.x, c.group.position.z, 14, 1.2)
     this.world.foam.ripple(c.group.position.x, c.group.position.z, 7)
     if (c.kind === 'dragon') this.setStorm(false)
@@ -1318,6 +1329,7 @@ export class CreatureSystem {
         phase: c.phase,
         skill: c.kind === 'turtle' && c.state === 'guard' ? '龟壳防御' : c.skillLabel,
         ultimate: Boolean(c.ultimate),
+        realm: creatureRealm(c.kind),
       })
     }
     if (c.hp <= 0) {
@@ -1375,18 +1387,24 @@ export class CreatureSystem {
     return { point: hits[0].point.clone(), dealt }
   }
 
-  aoeHit(center: THREE.Vector3, radius: number, damage: number, slow = 0) {
+  aoeHit(center: THREE.Vector3, radius: number, damage: number, slow = 0, source = '爆炸') {
     let hits = 0
     for (const c of this.creatures) {
       if (!c.alive) continue
       if (c.group.position.distanceTo(center) <= radius + c.radius) {
-        if (this.damageCreature(c.id, damage, '爆炸')) {
+        if (this.damageCreature(c.id, damage, source)) {
           if (slow > 0) c.slowT = Math.max(c.slowT, slow)
           hits++
         }
       }
     }
     return hits
+  }
+
+  slowIds(ids: string[], seconds: number) {
+    for (const c of this.creatures) {
+      if (ids.includes(c.id)) c.slowT = Math.max(c.slowT, seconds)
+    }
   }
 
   nearestCreatureDistance(origin: THREE.Vector3) {

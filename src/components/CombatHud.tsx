@@ -10,7 +10,8 @@ import {
   Sword,
   Video,
 } from 'lucide-react'
-import { useGameStore, MAX_HP } from '@/store/useGameStore'
+import { maxHpFor, useGameStore } from '@/store/useGameStore'
+import { suppressionLabel } from '@/game/cultivation/realms'
 import { WEAPONS, weaponById } from '@/game/combat/weapons'
 import { facilityById } from '@/game/boat/facilities'
 import { useNow } from '@/components/town/shared'
@@ -61,7 +62,7 @@ function WeaponButton({ id }: { id: (typeof WEAPONS)[number]['id'] }) {
       </span>
       <span className="truncate text-[9.5px] font-medium">{def.name}</span>
       <span className="hidden text-[7.5px] tracking-[0.12em] opacity-50 sm:block">
-        {id === 'knife' ? 'Z' : 'X'}
+        {id === 'knife' ? 'J' : 'K'}
       </span>
     </button>
   )
@@ -96,9 +97,11 @@ function FacilityButton({ id }: { id: FacilityId }) {
 
 function StatusPanel() {
   const hp = useGameStore((s) => s.hp)
+  const realm = useGameStore((s) => s.realm)
   const installed = useGameStore((s) => s.installedFacilities)
   const active = useGameStore((s) => s.facilityActive)
-  const low = hp <= 30
+  const maxHp = maxHpFor(realm)
+  const low = hp <= maxHp * 0.3
   const usable = installed.filter((id): id is FacilityId => Boolean(id))
   const quick = usable.filter((id) => id === 'anchor' || id === 'searchlight' || id === 'grill')
   const passive = usable.filter((id) => id === 'fishfinder' || id === 'livewell')
@@ -117,14 +120,14 @@ function StatusPanel() {
           生命
         </span>
         <span className={cn('tnum text-[10px] font-semibold', low ? 'text-destructive' : 'text-foam/75')}>
-          {hp}/{MAX_HP}
+          {hp}/{maxHp}
         </span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-foam/10">
         <div
           className="h-full rounded-full transition-[width] duration-300"
           style={{
-            width: `${Math.max(0, Math.min(100, (hp / MAX_HP) * 100))}%`,
+            width: `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`,
             background: low
               ? 'linear-gradient(90deg,#e2685a,#ff9a6b)'
               : 'linear-gradient(90deg,#6fe0cf,#a8f0e1)',
@@ -168,6 +171,7 @@ function StatusPanel() {
 
 function BossBar() {
   const boss = useGameStore((s) => s.boss)
+  const realm = useGameStore((s) => s.realm)
   const combatCamera = useGameStore((s) => s.combatCamera)
   const toggleCombatCamera = useGameStore((s) => s.toggleCombatCamera)
   if (!boss) return null
@@ -230,11 +234,24 @@ function BossBar() {
           />
           <span className="absolute inset-y-0 left-1/2 w-px bg-black/60" />
         </div>
-        <div className="mt-1 flex items-center justify-between text-[8.5px] text-foam/45">
-          <span className="tnum">
+        <div className="mt-1 flex items-center justify-between gap-2 text-[8.5px] text-foam/45">
+          <span className="tnum shrink-0">
             {Math.ceil(boss.hp)} / {boss.maxHp}
           </span>
-          <span className={enraged ? 'text-destructive/80' : 'text-gold/70'}>{boss.skill}</span>
+          <span className={cn('truncate', enraged ? 'text-destructive/80' : 'text-gold/70')}>
+            {boss.skill}
+          </span>
+          {boss.realm !== undefined && realm !== boss.realm && (
+            <span
+              className={cn(
+                'shrink-0 tracking-[0.04em]',
+                realm > boss.realm ? 'text-tide/70' : 'text-destructive/70',
+              )}
+              title={suppressionLabel(realm, boss.realm)}
+            >
+              {realm > boss.realm ? '境界压制' : '境界受压'}
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -88,6 +88,7 @@ export interface BossHud {
   phase: number
   skill: string
   ultimate?: boolean
+  realm?: number
 }
 
 export interface RadarContact {

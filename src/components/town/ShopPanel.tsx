@@ -374,7 +374,7 @@ export function ShopPanel() {
           <Gauge className="size-3" />
           进阶捕捞工具
           <span className="ml-auto text-[8.5px] normal-case tracking-normal text-foam/25">
-            水下按 Q 切换型号
+            按 Z 切换型号
           </span>
         </div>
         {(['harpoon', 'net'] as const).map((category) => (
@@ -397,7 +397,7 @@ export function ShopPanel() {
           <Sword className="size-3" />
           防身武器
           <span className="ml-auto text-[8.5px] normal-case tracking-normal text-foam/25">
-            Z 挥刀 · X 鱼枪
+            J 挥刀 · K 鱼枪
           </span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">

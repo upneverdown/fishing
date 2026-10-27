@@ -31,6 +31,8 @@ import { PlayerSkinShop } from '@/components/PlayerSkinShop'
 import { DragonRaceHud } from '@/components/DragonRaceHud'
 import { CrewCatchNotice } from '@/components/CrewCatchNotice'
 import { SeaEventHud } from '@/components/SeaEventHud'
+import { CultivationHud } from '@/components/CultivationHud'
+import { TribulationOverlay } from '@/components/TribulationOverlay'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 
@@ -65,6 +67,8 @@ export default function App() {
           <SeaEventHud />
           <DragonRaceHud />
           <CrewCatchNotice />
+          <CultivationHud />
+          <TribulationOverlay />
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (

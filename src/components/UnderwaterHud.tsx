@@ -49,8 +49,8 @@ const HINTS = [
   { keys: ['E', '点击'], label: '出手捕捞' },
   { keys: ['点击'], label: '观察鱼群' },
   { keys: ['Q'], label: '切换工具型号' },
-  { keys: ['Z'], label: '挥刀' },
-  { keys: ['X'], label: '鱼枪射击' },
+  { keys: ['J'], label: '挥刀' },
+  { keys: ['K'], label: '鱼枪射击' },
   { keys: ['F'], label: '开宝箱 / 切换视角' },
   { keys: ['V'], label: '浮回水面' },
 ]

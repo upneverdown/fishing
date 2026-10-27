@@ -12,9 +12,11 @@ const DESKTOP_CONTROLS = [
   { keys: '按住空格', text: '咬钩后收线' },
   { keys: 'E / I', text: '码头卖鱼 / 查看鱼篓' },
   { keys: 'Shift', text: '按住加速冲刺 · 船尾激起浪花' },
-  { keys: 'R / T', text: '切换鱼饵 / 四季' },
-  { keys: 'B / K', text: '皮肤商店 / 船员名册' },
-  { keys: 'V / F', text: '潜入水下 / 切换视角' },
+  { keys: 'X / T', text: '切换鱼饵 / 四季' },
+  { keys: 'B / N / M', text: '皮肤商店 / 成就 / 船员名册' },
+  { keys: 'J / K', text: '挥刀劈砍 / 鱼枪射击' },
+  { keys: 'Q · E · R', text: '御水诀 / 火龙术 / 万剑归宗（随境界解锁）' },
+  { keys: 'V / F', text: '潜入水下 / 切换视角 · 吸收内丹' },
 ]
 
 const TOUCH_CONTROLS = [
