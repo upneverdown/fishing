@@ -444,6 +444,8 @@ export interface FishPickContext {
   baitWear?: number
   zone?: WaterId | null
   map?: MapZone
+  /** 气运放大：>1 时高品阶鱼权重上升（仙人鱼王特权） */
+  luck?: number
 }
 
 export function baitPreference(def: FishDef, bait?: BaitId) {
@@ -477,7 +479,9 @@ export function pickFish(depth: number, ctx: FishPickContext = {}): FishDef {
         ? 4.5
         : 0.05
       : 1
-    const w = rarity.weight * depthBoost * seasonBoost * periodBoost * baitBoost * zoneBoost
+    const luckIndex = RARITY_ORDER.indexOf(f.rarity) / 2
+    const luckBoost = Math.pow(ctx.luck ?? 1, luckIndex)
+    const w = rarity.weight * depthBoost * seasonBoost * periodBoost * baitBoost * zoneBoost * luckBoost
     total += w
     return w
   })

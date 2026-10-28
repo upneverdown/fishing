@@ -34,6 +34,7 @@ import { SeaEventHud } from '@/components/SeaEventHud'
 import { CultivationHud } from '@/components/CultivationHud'
 import { TribulationOverlay } from '@/components/TribulationOverlay'
 import { AscensionOverlay } from '@/components/AscensionOverlay'
+import { FactionChoiceOverlay } from '@/components/FactionChoiceOverlay'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 
@@ -90,6 +91,7 @@ export default function App() {
           <CultivationHud />
           <TribulationOverlay />
           <AscensionOverlay />
+          <FactionChoiceOverlay />
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (

@@ -1,5 +1,7 @@
-import type { MapZone } from '@/types'
+import type { MapZone, Rarity } from '@/types'
 import type { BoatSkinId } from '@/game/shop/catalog'
+import type { FactionId } from '@/game/cultivation/factions'
+import type { TechniqueId } from '@/game/sect/techniques'
 
 export interface GameEventMap {
   'boss:defeated': { id: string; name: string; ultimate: boolean }
@@ -18,6 +20,12 @@ export interface GameEventMap {
   'zone:changed': { zone: MapZone }
   'ascension:gate': { at: number }
   'ascension:done': { to: MapZone }
+  'faction:chosen': { faction: FactionId }
+  'sect:tithe': { defId: string; rarity: Rarity; contribution: number }
+  'sect:learn': { technique: TechniqueId; level: number }
+  'thunderlure:strike': { x: number; z: number; radius: number; catches: number }
+  'contest:win': { opponent: string }
+  'contest:loss': { opponent: string }
 }
 
 type Handler<T> = (payload: T) => void

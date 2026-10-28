@@ -130,6 +130,21 @@ import {
   realmAt,
   realmSuppressionMul,
 } from '@/game/cultivation/realms'
+import {
+  factionOf,
+  hasFaction,
+  isFactionId,
+  type FactionId,
+} from '@/game/cultivation/factions'
+import {
+  CONTRIBUTION_BY_RARITY,
+  MAX_EQUIPPED,
+  isTechniqueId,
+  techniqueById,
+  techniqueCost,
+  type TechniqueId,
+} from '@/game/sect/techniques'
+import { gameEvents } from '@/game/eventBus'
 
 export const BAG_CAPACITY = 10
 export const MAX_HP = 100
@@ -226,6 +241,24 @@ export interface AscensionHud {
   altitude: number
 }
 
+export type ContestPhase = 'idle' | 'entering' | 'fighting' | 'won' | 'lost'
+
+export interface ContestHud {
+  phase: ContestPhase
+  opponent: string
+  faction: FactionId
+  hp: number
+  maxHp: number
+  seconds: number
+  /** 胜后奖励说明 */
+  reward: string | null
+}
+
+/** 空白的功法表：新档与读档兜底共用 */
+export function emptyTechniques(): Record<TechniqueId, number> {
+  return { taigong: 0, thunderlure: 0, swordflight: 0, starabsorb: 0 }
+}
+
 interface PersistedProgress {
   money: number
   bag: Catch[]
@@ -282,6 +315,17 @@ interface PersistedProgress {
   immortalJade: number
   /** 是否已完成飞升（决定能否往返两界） */
   ascended: boolean
+  /** 渡劫成功后的仙魔转职，一旦选定不可更改 */
+  playerFaction: FactionId | null
+  /** 宗门贡献度：上交鱼获与大比胜利换取 */
+  contribution: number
+  /** 已修功法等级，0 表示未学 */
+  techniques: Record<TechniqueId, number>
+  /** 同时最多装备三个功法 */
+  equippedTechniques: TechniqueId[]
+  /** 宗门大比战绩 */
+  contestWins: number
+  contestLosses: number
 }
 
 interface GameStore extends PersistedProgress {
@@ -336,6 +380,10 @@ interface GameStore extends PersistedProgress {
   tribulation: TribulationHud | null
   skillCds: SkillCdHud[]
   ascension: AscensionHud | null
+  factionChoiceOpen: boolean
+  /** 非空即宗门大殿面板已打开，值决定是哪一座山门 */
+  sectAt: FactionId | null
+  contest: ContestHud | null
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -456,6 +504,17 @@ interface GameStore extends PersistedProgress {
   grantJade: (amount: number, text?: string) => void
   spendJade: (amount: number) => boolean
   setAscension: (hud: AscensionHud | null) => void
+  openFactionChoice: () => void
+  chooseFaction: (id: FactionId) => void
+  setSectAt: (sect: FactionId | null) => void
+  grantContribution: (amount: number, text?: string) => void
+  spendContribution: (amount: number) => boolean
+  submitCatchForContribution: (catchId: string) => boolean
+  learnTechnique: (id: TechniqueId) => boolean
+  upgradeTechnique: (id: TechniqueId) => boolean
+  toggleTechnique: (id: TechniqueId) => boolean
+  setContest: (hud: ContestHud | null) => void
+  recordContestResult: (won: boolean, opponent: string) => void
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
   resetProgress: () => void
@@ -670,6 +729,37 @@ function readSave(): Partial<PersistedProgress> {
       out.immortalJade = Math.max(0, Math.round(p.immortalJade))
     }
     if (typeof p.ascended === 'boolean') out.ascended = p.ascended
+    if (isFactionId(p.playerFaction)) out.playerFaction = p.playerFaction
+    else if (p.playerFaction === null || p.playerFaction === undefined) out.playerFaction = null
+    if (typeof p.contribution === 'number' && Number.isFinite(p.contribution)) {
+      out.contribution = Math.max(0, Math.round(p.contribution))
+    }
+    if (isObj(p.techniques)) {
+      const tech = emptyTechniques()
+      for (const id of Object.keys(tech) as TechniqueId[]) {
+        const value = p.techniques[id]
+        const def = techniqueById(id)
+        if (def && typeof value === 'number' && Number.isFinite(value)) {
+          tech[id] = Math.max(0, Math.min(def.maxLevel, Math.round(value)))
+        }
+      }
+      out.techniques = tech
+    }
+    if (Array.isArray(p.equippedTechniques)) {
+      const picked: TechniqueId[] = []
+      for (const value of p.equippedTechniques) {
+        if (!isTechniqueId(value) || picked.includes(value)) continue
+        const level = out.techniques?.[value] ?? 0
+        if (level > 0 && picked.length < MAX_EQUIPPED) picked.push(value)
+      }
+      out.equippedTechniques = picked
+    }
+    if (typeof p.contestWins === 'number' && Number.isFinite(p.contestWins)) {
+      out.contestWins = Math.max(0, Math.round(p.contestWins))
+    }
+    if (typeof p.contestLosses === 'number' && Number.isFinite(p.contestLosses)) {
+      out.contestLosses = Math.max(0, Math.round(p.contestLosses))
+    }
     return out
   } catch {
     return {}
@@ -919,6 +1009,12 @@ export const useGameStore = create<GameStore>()((set, get) => {
       mapZone,
       immortalJade,
       ascended,
+      playerFaction,
+      contribution,
+      techniques,
+      equippedTechniques,
+      contestWins,
+      contestLosses,
     } = get()
     try {
       localStorage.setItem(
@@ -976,6 +1072,12 @@ export const useGameStore = create<GameStore>()((set, get) => {
           mapZone,
           immortalJade,
           ascended,
+          playerFaction,
+          contribution,
+          techniques,
+          equippedTechniques,
+          contestWins,
+          contestLosses,
         }),
       )
     } catch {
@@ -1063,6 +1165,12 @@ export const useGameStore = create<GameStore>()((set, get) => {
     ascended: saved.ascended === true,
     mapZone: saved.ascended === true ? (saved.mapZone ?? 'mortal') : 'mortal',
     immortalJade: saved.immortalJade ?? 0,
+    playerFaction: saved.playerFaction ?? null,
+    contribution: saved.contribution ?? 0,
+    techniques: saved.techniques ?? emptyTechniques(),
+    equippedTechniques: saved.equippedTechniques ?? [],
+    contestWins: saved.contestWins ?? 0,
+    contestLosses: saved.contestLosses ?? 0,
 
     started: false,
     phase: 'idle',
@@ -1115,6 +1223,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     tribulation: null,
     skillCds: [],
     ascension: null,
+    factionChoiceOpen: false,
+    sectAt: null,
+    contest: null,
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -2089,9 +2200,14 @@ export const useGameStore = create<GameStore>()((set, get) => {
     damagePlayer: (amount, source = '海怪') => {
       const state = get()
       if (state.dead) return false
+      const faction = factionOf(state.playerFaction)
+      if (faction.dodgeChance > 0 && Math.random() < faction.dodgeChance) {
+        state.toast(`${source}扑了个空 · 仙诀闪避`, 'gold')
+        return false
+      }
       const armor = !state.underwater && state.boatSkin === 'pirate' ? 0.62 : 1
       const pressure = state.boss ? realmSuppressionMul(state.realm, state.boss.realm ?? 0) : 1
-      const dmg = Math.max(1, Math.round(amount * armor * pressure))
+      const dmg = Math.max(1, Math.round(amount * armor * pressure * faction.hurtMul))
       const hp = Math.max(0, state.hp - dmg)
       if (hp <= 0) {
         const lost = Math.floor(state.bag.length / 2)
@@ -2656,6 +2772,149 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
     setAscension: (ascension) => set({ ascension }),
 
+    openFactionChoice: () => {
+      if (get().playerFaction) return
+      set({ factionChoiceOpen: true })
+    },
+
+    chooseFaction: (id) => {
+      const state = get()
+      if (state.playerFaction) return
+      const def = factionOf(id)
+      set({ playerFaction: id, factionChoiceOpen: false })
+      persist()
+      state.toast(`自今日起，你便是${def.name}`, id === 'immortal' ? 'gold' : 'danger')
+      gameEvents.emit('faction:chosen', { faction: id })
+    },
+
+    setSectAt: (sectAt) => set({ sectAt }),
+
+    grantContribution: (amount, text) => {
+      const gained = Math.max(0, Math.round(amount))
+      if (!gained) return
+      set({ contribution: get().contribution + gained })
+      persist()
+      get().toast(text ?? `宗门贡献 +${gained}`, 'gold')
+    },
+
+    spendContribution: (amount) => {
+      const state = get()
+      const cost = Math.max(0, Math.round(amount))
+      if (state.contribution < cost) {
+        state.toast('宗门贡献不足', 'danger')
+        return false
+      }
+      set({ contribution: state.contribution - cost })
+      persist()
+      return true
+    },
+
+    submitCatchForContribution: (catchId) => {
+      const state = get()
+      const target = state.bag.find((c) => c.id === catchId)
+      if (!target) return false
+      const gained = target.junk ? 1 : CONTRIBUTION_BY_RARITY[target.rarity] ?? 2
+      set({
+        bag: state.bag.filter((c) => c.id !== catchId),
+        contribution: state.contribution + gained,
+      })
+      persist()
+      state.toast(`上交 ${target.name} · 贡献 +${gained}`, 'gold')
+      gameEvents.emit('sect:tithe', { defId: target.defId, rarity: target.rarity, contribution: gained })
+      return true
+    },
+
+    learnTechnique: (id) => {
+      const state = get()
+      const def = techniqueById(id)
+      if (!def) return false
+      if (state.techniques[id] > 0) return false
+      if (def.learn.faction && state.playerFaction !== def.learn.faction) {
+        state.toast(`${def.name}乃${factionOf(def.learn.faction).name}不传之秘`, 'danger')
+        return false
+      }
+      const cost = techniqueCost(def, 0)
+      if (state.contribution < cost) {
+        state.toast(`宗门贡献不足，尚缺${cost - state.contribution}`, 'danger')
+        return false
+      }
+      if (def.learn.cores && state.cultivationCores < def.learn.cores) {
+        state.toast('内丹不足，功法无法开解', 'danger')
+        return false
+      }
+      if (def.learn.jade && state.immortalJade < def.learn.jade) {
+        state.toast('仙玉不足', 'danger')
+        return false
+      }
+      set({
+        contribution: state.contribution - cost,
+        cultivationCores: state.cultivationCores - (def.learn.cores ?? 0),
+        immortalJade: state.immortalJade - (def.learn.jade ?? 0),
+        techniques: { ...state.techniques, [id]: 1 },
+      })
+      persist()
+      state.toast(`功法《${def.name}》初成`, 'gold')
+      gameEvents.emit('sect:learn', { technique: id, level: 1 })
+      return true
+    },
+
+    upgradeTechnique: (id) => {
+      const state = get()
+      const def = techniqueById(id)
+      if (!def) return false
+      const level = state.techniques[id]
+      if (level <= 0) return false
+      if (level >= def.maxLevel) {
+        state.toast(`《${def.name}》已至圆满`, 'info')
+        return false
+      }
+      const cost = techniqueCost(def, level)
+      if (state.contribution < cost) {
+        state.toast(`精进尚缺${cost - state.contribution}贡献`, 'danger')
+        return false
+      }
+      set({
+        contribution: state.contribution - cost,
+        techniques: { ...state.techniques, [id]: level + 1 },
+      })
+      persist()
+      state.toast(`《${def.name}》精进至第${level + 1}重`, 'gold')
+      gameEvents.emit('sect:learn', { technique: id, level: level + 1 })
+      return true
+    },
+
+    toggleTechnique: (id) => {
+      const state = get()
+      if (state.techniques[id] <= 0) return false
+      if (state.equippedTechniques.includes(id)) {
+        set({ equippedTechniques: state.equippedTechniques.filter((t) => t !== id) })
+        persist()
+        return true
+      }
+      if (state.equippedTechniques.length >= MAX_EQUIPPED) {
+        state.toast(`同时只能运转${MAX_EQUIPPED}部功法`, 'danger')
+        return false
+      }
+      set({ equippedTechniques: [...state.equippedTechniques, id] })
+      persist()
+      return true
+    },
+
+    setContest: (contest) => set({ contest }),
+
+    recordContestResult: (won, opponent) => {
+      const state = get()
+      if (won) {
+        set({ contestWins: state.contestWins + 1 })
+        persist()
+        gameEvents.emit('contest:win', { opponent })
+        return
+      }
+      set({ contestLosses: state.contestLosses + 1 })
+      persist()
+      gameEvents.emit('contest:loss', { opponent })
+    },
+
     gainCultivation: (xp, source) => {
       const state = get()
       const gained = Math.max(0, Math.round(xp))
@@ -2757,6 +3016,15 @@ export const useGameStore = create<GameStore>()((set, get) => {
         mapZone: 'mortal',
         immortalJade: 0,
         ascended: false,
+        playerFaction: null,
+        contribution: 0,
+        techniques: emptyTechniques(),
+        equippedTechniques: [],
+        contestWins: 0,
+        contestLosses: 0,
+        factionChoiceOpen: false,
+        sectAt: null,
+        contest: null,
         tribulation: null,
         skillCds: [],
         ascension: null,
@@ -2835,6 +3103,8 @@ export function isModalOpen(state: GameStore = useGameStore.getState()) {
       state.achievementsOpen ||
       state.crewOpen ||
       state.skinShopOpen ||
+      state.factionChoiceOpen ||
+      state.sectAt !== null ||
       state.dead,
   )
 }

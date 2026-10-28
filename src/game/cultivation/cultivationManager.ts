@@ -5,6 +5,8 @@ import { gameEvents } from '@/game/eventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { audio } from '@/game/audio/gameAudio'
 import { clamp } from '@/game/utils/math'
+import { factionOf } from '@/game/cultivation/factions'
+import { maxHpFor } from '@/store/useGameStore'
 import {
   SKILLS,
   coreSpec,
@@ -158,6 +160,9 @@ export class CultivationManager {
 
   private seq = 0
   private clock = 0
+  private pendingHeal = 0
+  private healToastAt = -99
+  private healLabel = '仙气护体'
   private cooldowns: Record<SkillId, number> = { water: 0, fire: 0, sword: 0 }
   private lastCds = ''
 
@@ -547,7 +552,10 @@ export class CultivationManager {
       if (fire.tick <= 0 && fire.age < fire.life) {
         fire.tick = 0.55
         const hits = this.creatures.aoeHit(fire.center, fire.radius, fire.damage, 0, '火龙术')
-        if (hits) this.world.foam.splash(fire.center.x, fire.center.z, 6, 0.5)
+        if (hits) {
+          this.world.foam.splash(fire.center.x, fire.center.z, 6, 0.5)
+          this.healBySkill(state, fire.damage, hits)
+        }
       }
       if (fire.age >= fire.life) {
         this.fires.splice(i, 1)
@@ -573,7 +581,9 @@ export class CultivationManager {
         ring.strike = 0.6
         const contact = this.nearestContact(player.position, 30)
         if (contact) {
-          this.creatures.damageCreature(contact.id, ring.damage, '万剑归宗')
+          if (this.creatures.damageCreature(contact.id, ring.damage, '万剑归宗')) {
+            this.healBySkill(state, ring.damage, 1)
+          }
           const at = new THREE.Vector3(contact.x, 0.6, contact.z)
           this.burst(at, 26, 1.6)
         }
@@ -712,6 +722,31 @@ export class CultivationManager {
     audio.thunder()
   }
 
+  /** 神通伤害吃境界与阵营双系数 */
+  private skillDamage(state: ReturnType<typeof useGameStore.getState>, base: number) {
+    return Math.round(base * realmAttackMul(state.realm) * factionOf(state.playerFaction).attackMul)
+  }
+
+  /** 仙人神通回血，魔人神通噬血 */
+  private healBySkill(state: ReturnType<typeof useGameStore.getState>, damage: number, hits: number) {
+    if (hits <= 0) return
+    const faction = factionOf(state.playerFaction)
+    const heal = Math.round(damage * (faction.skillHeal + faction.lifesteal))
+    const room = maxHpFor(state.realm) - state.hp
+    if (heal <= 0 || room <= 0) return
+    const amount = Math.min(heal, room)
+    state.healPlayer(amount)
+    this.pendingHeal += amount
+    this.healLabel = state.playerFaction === 'demon' ? '魔气噬血' : '仙气护体'
+    // 火海与飞剑每半秒结算一次，提示攒着报，免得刷屏
+    if (this.clock - this.healToastAt > 2.5) {
+      this.healToastAt = this.clock
+      const total = this.pendingHeal
+      this.pendingHeal = 0
+      state.toast(`${this.healLabel} · 生命 +${total}`, 'gold')
+    }
+  }
+
   // 技能：御水诀
   castWater(player: CultivationPlayer) {
     const state = useGameStore.getState()
@@ -722,7 +757,7 @@ export class CultivationManager {
     if (this.cooldowns.water > 0) return false
 
     this.cooldowns.water = SKILLS[0].cooldown
-    const damage = Math.round(SKILLS[0].damage * realmAttackMul(state.realm))
+    const damage = this.skillDamage(state, SKILLS[0].damage)
     const group = new THREE.Group()
     for (let i = 0; i < 3; i++) {
       const ring = new THREE.Mesh(
@@ -764,6 +799,7 @@ export class CultivationManager {
       if (this.creatures.damageCreature(contact.id, damage, '御水诀')) hits.push(contact.id)
     }
     this.creatures.slowIds(hits, 2.6)
+    this.healBySkill(state, damage, hits.length)
     this.world.foam.splash(player.position.x, player.position.z, 14, 1)
     audio.splash(hits.length ? 1.4 : 0.9)
     if (!hits.length) state.toast('御水诀冲出一道水墙 · 附近没有海怪', 'info')
@@ -845,7 +881,7 @@ export class CultivationManager {
       age: 0,
       life: 4.2,
       tick: 0,
-      damage: Math.round(SKILLS[1].damage * realmAttackMul(state.realm)),
+      damage: this.skillDamage(state, SKILLS[1].damage),
     })
     this.world.foam.splash(center.x, center.z, 12, 0.8)
     audio.thunder()
@@ -902,7 +938,7 @@ export class CultivationManager {
       life: 9,
       strike: 0,
       angle: 0,
-      damage: Math.round(SKILLS[2].damage * realmAttackMul(state.realm)),
+      damage: this.skillDamage(state, SKILLS[2].damage),
     })
     audio.snap()
     state.toast('万剑归宗 · 飞剑绕身追斩海怪', 'gold')

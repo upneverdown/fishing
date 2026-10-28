@@ -1,5 +1,6 @@
 import { Droplets, Flame, Gem, Sparkles, Swords } from 'lucide-react'
 import { realmAt } from '@/game/cultivation/realms'
+import { FACTIONS } from '@/game/cultivation/factions'
 import { useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
 
@@ -67,6 +68,8 @@ export function CultivationHud() {
   const realm = useGameStore((s) => s.realm)
   const xp = useGameStore((s) => s.cultivationXp)
   const cores = useGameStore((s) => s.cultivationCores)
+  const faction = useGameStore((s) => s.playerFaction)
+  const contribution = useGameStore((s) => s.contribution)
   const underwater = useGameStore((s) => s.underwater)
   const current = realmAt(realm)
   const next = realmAt(realm + 1)
@@ -105,14 +108,26 @@ export function CultivationHud() {
           className="h-full rounded-full transition-[width] duration-300"
           style={{
             width: `${pct}%`,
-            background: `linear-gradient(90deg,${current.color},${next.color})`,
-            boxShadow: `0 0 12px ${current.glow}`,
+            background: `linear-gradient(90deg,${
+              faction === 'immortal' ? '#3fd8c6' : faction === 'demon' ? '#8e1f26' : current.color
+            },${faction ? FACTIONS[faction].color : next.color})`,
+            boxShadow: `0 0 12px ${faction ? FACTIONS[faction].glow : current.glow}`,
           }}
         />
       </div>
       <div className="mt-0.5 truncate text-[8px] text-foam/35">
         {capped ? current.motto : `渡劫可入${next.name}`}
       </div>
+
+      {faction && (
+        <div
+          className="mt-1 flex items-center justify-between rounded-md px-1.5 py-0.5 text-[9px] tracking-[0.14em]"
+          style={{ background: FACTIONS[faction].soft, color: FACTIONS[faction].color }}
+        >
+          <span>{FACTIONS[faction].name}</span>
+          <span className="tnum">贡献 {contribution}</span>
+        </div>
+      )}
 
       <div className="mt-1.5 flex flex-col gap-1 border-t border-white/6 pt-1.5">
         <SkillChip id="water" />

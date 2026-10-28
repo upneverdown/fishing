@@ -5,6 +5,8 @@ import { Otter } from '@/game/entities/otter'
 import { FishingSystem } from '@/game/fishing/fishingSystem'
 import { FloatingLeaves } from '@/game/fx/leaves'
 import { SeasonFx } from '@/game/fx/seasonFx'
+import { FactionAura } from '@/game/fx/factionAura'
+import { FACTIONS, factionOf, type FactionId } from '@/game/cultivation/factions'
 import { UnderwaterWorld } from '@/game/underwater/underwaterWorld'
 import { UnderwaterPost } from '@/game/render/underwaterPost'
 import { input } from '@/game/input'
@@ -71,6 +73,7 @@ export class Game {
   readonly fishing: FishingSystem
   readonly leaves: FloatingLeaves
   readonly seasonFx: SeasonFx
+  readonly factionAura: FactionAura
   readonly underwaterWorld: UnderwaterWorld
   readonly creatures: CreatureSystem
   readonly cultivation: CultivationManager
@@ -118,6 +121,7 @@ export class Game {
   private right = new THREE.Vector3()
   private stern = new THREE.Vector3()
   private viewDir = new THREE.Vector3()
+  private auraCenter = new THREE.Vector3()
 
   private swimPos = new THREE.Vector3()
   private swimVel = new THREE.Vector3()
@@ -210,6 +214,7 @@ export class Game {
   private appliedDecorations = ''
   private appliedSeason: SeasonId | '' = ''
   private appliedPlayerSkin = ''
+  private appliedFaction: FactionId | null = null
   private lastUnderwater = false
   private autoLockedBossId = ''
   private raceSyncTimer = 0
@@ -238,6 +243,7 @@ export class Game {
     this.fishing = new FishingSystem(this.scene, this.boat, this.world)
     this.leaves = new FloatingLeaves(this.scene, this.world)
     this.seasonFx = new SeasonFx(this.scene)
+    this.factionAura = new FactionAura(this.scene)
     this.underwaterWorld = new UnderwaterWorld(this.scene, this.world)
     this.creatures = new CreatureSystem(this.scene, this.world)
     this.cultivation = new CultivationManager(this.scene, this.world, this.creatures)
@@ -602,6 +608,13 @@ export class Game {
       this.appliedPlayerSkin = store.playerSkin
       if (!firstSync) store.toast(`已换上 ${playerSkinById(store.playerSkin).name}`, 'gold')
     }
+    if (store.playerFaction !== this.appliedFaction) {
+      this.appliedFaction = store.playerFaction
+      const faction = store.playerFaction ? FACTIONS[store.playerFaction] : null
+      this.avatar.setFaction(store.playerFaction)
+      this.boat.setFaction(store.playerFaction)
+      this.factionAura.setFaction(faction)
+    }
   }
 
   private syncSeason(store: ReturnType<typeof useGameStore.getState>, immediate = false) {
@@ -908,6 +921,7 @@ export class Game {
       this.seasonFx.update(time, dt, this.boat.position)
       this.seasonFx.setVisible(true)
     }
+    this.factionAura.update(time, dt, this.auraCenter.set(this.boat.position.x, this.boat.position.y + 0.9, this.boat.position.z))
 
     this.wakeTimer -= dt
     if (!modal && !locked && allowMove && this.boat.speed > 1.5 && this.wakeTimer <= 0) {
@@ -1000,6 +1014,11 @@ export class Game {
   private openAscension() {
     if (this.gate.isActive) return
     const store = useGameStore.getState()
+    // 飞升前必须先定仙魔，选定后 UI 会重新敲响这道门
+    if (!store.playerFaction) {
+      store.openFactionChoice()
+      return
+    }
     this.fishing.reset()
     this.boat.getForward(this.forward)
     this.gate.start(this.boat.position, this.forward)
@@ -2086,6 +2105,16 @@ export class Game {
     return true
   }
 
+  /** 魔道吸血：命中才回血，向上取整保证一刀至少回 1 点 */
+  private applyLeech(amount: number, label: string) {
+    if (amount <= 0) return
+    const store = useGameStore.getState()
+    if (store.hp >= maxHpFor(store.realm)) return
+    const healed = Math.min(Math.max(1, Math.round(amount)), maxHpFor(store.realm) - store.hp)
+    store.healPlayer(healed)
+    store.toast(`${label} · 生命 +${healed}`, 'gold')
+  }
+
   private attackMelee() {
     const store = useGameStore.getState()
     const def = weaponById('knife')
@@ -2115,9 +2144,13 @@ export class Game {
       }
     }
     const range = isOnBoat ? def.range + 4.6 : def.range
-    const damage = Math.round(def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm))
+    const faction = factionOf(store.playerFaction)
+    const damage = Math.round(
+      def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm) * faction.attackMul,
+    )
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
     this.seaEvents.strike(origin, this.viewDir, range, damage)
+    if (hits) this.applyLeech(damage * faction.lifesteal, '渔刀饮血')
     if (isOnBoat && !hits) {
       const fish = this.findBoatFish(range, 0.1)
       if (fish) this.catchSurfaceFish(fish, 0.62)
@@ -2147,9 +2180,13 @@ export class Game {
       this.viewDir.y = Math.max(-0.02, this.viewDir.y * 0.3)
       this.viewDir.normalize()
     }
-    const damage = Math.round(def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm))
+    const faction = factionOf(store.playerFaction)
+    const damage = Math.round(
+      def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm) * faction.attackMul,
+    )
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
+    if (hit) this.applyLeech(damage * faction.lifesteal, '鱼枪饮血')
     if (hit) {
       this.showSpearRope(hit.point)
       this.flashMuzzle(hit.point)
@@ -2757,6 +2794,7 @@ export class Game {
     this.achievements.dispose()
     this.post.dispose()
     this.seasonFx.dispose()
+    this.factionAura.dispose()
     this.underwaterWorld.dispose()
     this.leaves.dispose()
     this.renderer.dispose()

@@ -98,6 +98,7 @@ function FacilityButton({ id }: { id: FacilityId }) {
 function StatusPanel() {
   const hp = useGameStore((s) => s.hp)
   const realm = useGameStore((s) => s.realm)
+  const faction = useGameStore((s) => s.playerFaction)
   const installed = useGameStore((s) => s.installedFacilities)
   const active = useGameStore((s) => s.facilityActive)
   const maxHp = maxHpFor(realm)
@@ -130,8 +131,18 @@ function StatusPanel() {
             width: `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`,
             background: low
               ? 'linear-gradient(90deg,#e2685a,#ff9a6b)'
-              : 'linear-gradient(90deg,#6fe0cf,#a8f0e1)',
-            boxShadow: low ? '0 0 12px #e2685a88' : '0 0 12px #6fe0cf55',
+              : faction === 'immortal'
+                ? 'linear-gradient(90deg,#3fd8c6,#9ff0ff)'
+                : faction === 'demon'
+                  ? 'linear-gradient(90deg,#7c1a20,#d2503f)'
+                  : 'linear-gradient(90deg,#6fe0cf,#a8f0e1)',
+            boxShadow: low
+              ? '0 0 12px #e2685a88'
+              : faction === 'demon'
+                ? '0 0 12px #8e1f2688'
+                : faction === 'immortal'
+                  ? '0 0 12px #6fe0cf88'
+                  : '0 0 12px #6fe0cf55',
           }}
         />
       </div>

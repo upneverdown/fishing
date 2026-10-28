@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { World } from '@/game/world/world'
 import { SPAWN } from '@/game/world/worldMap'
+import { FACTIONS, type FactionId } from '@/game/cultivation/factions'
 import { clamp } from '@/game/utils/math'
 import {
   BOAT_STYLES,
@@ -390,6 +391,27 @@ export class Boat {
   private reelMaterial!: THREE.MeshStandardMaterial
   private accentMaterial!: THREE.MeshStandardMaterial
 
+  /** 阵营旗与船首符环：每次转职只换材质色，不重建船体 */
+  private factionRig = new THREE.Group()
+  private factionCloth = new THREE.MeshStandardMaterial({
+    color: '#ffffff',
+    emissive: '#ffffff',
+    emissiveIntensity: 0.22,
+    roughness: 0.86,
+    side: THREE.DoubleSide,
+    flatShading: true,
+  })
+  private factionSigil = new THREE.MeshStandardMaterial({
+    color: '#ffffff',
+    emissive: '#ffffff',
+    emissiveIntensity: 0.85,
+    roughness: 0.45,
+    flatShading: true,
+  })
+  private factionBanner!: THREE.Mesh
+  private factionRing!: THREE.Mesh
+  private factionPlanks!: THREE.Mesh[]
+
   private skinId: BoatSkinId = 'rowboat'
   private layout = LAYOUTS.rowboat
   private speedMul = 1
@@ -417,6 +439,7 @@ export class Boat {
     this.buildLantern()
     this.buildDecorations()
     this.buildShadow()
+    this.buildFactionRig()
 
     this.stern.position.set(0, 0.3, 1.5)
     this.group.add(this.stern)
@@ -428,6 +451,45 @@ export class Boat {
     this.group.position.set(SPAWN.x, 0, SPAWN.z)
     this.group.rotation.y = this.heading
     scene.add(this.group)
+  }
+
+  private buildFactionRig() {
+    this.factionBanner = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.82, 1, 3), this.factionCloth)
+    this.factionBanner.castShadow = true
+    this.factionRing = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.045, 6, 14), this.factionSigil)
+    this.factionRing.rotation.x = Math.PI / 2
+    this.factionPlanks = [-1, 1].map((side) => {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 1.6), this.factionSigil)
+      plank.position.set(side * 0.62, 0.34, 0.1)
+      return plank
+    })
+    this.factionRig.add(this.factionBanner, this.factionRing, ...this.factionPlanks)
+    this.factionRig.visible = false
+    this.group.add(this.factionRig)
+  }
+
+  /** 仙魔转职后给船挂上阵营旗、船首符环与舷侧符板 */
+  setFaction(id: FactionId | null) {
+    this.factionRig.visible = Boolean(id)
+    if (!id) return
+    const f = FACTIONS[id]
+    this.factionCloth.color.set(f.hull)
+    this.factionCloth.emissive.set(f.accent)
+    this.factionSigil.color.set(f.trim)
+    this.factionSigil.emissive.set(f.accent)
+    this.factionSigil.emissiveIntensity = id === 'immortal' ? 1.05 : 0.7
+    this.layoutFactionRig()
+  }
+
+  private layoutFactionRig() {
+    const flag = this.layout.flag
+    this.factionBanner.position.set(flag[0], flag[1] + 0.56, flag[2])
+    const head = this.layout.figurehead
+    this.factionRing.position.set(head[0], head[1] + 0.16, head[2])
+    for (const plank of this.factionPlanks) {
+      plank.scale.z = Math.max(0.7, this.collisionHalfLength / 1.7)
+      plank.position.x = Math.sign(plank.position.x) * (this.collisionHalfWidth * 0.86 || 0.62)
+    }
   }
 
   setBoatSkin(id: BoatSkinId) {
@@ -977,6 +1039,7 @@ export class Boat {
     this.decorations.get('crate')?.position.set(...layout.crate)
     this.shadowMesh.scale.set(layout.shadow[0] / 2.9, layout.shadow[1] / 4.9, 1)
     this.layoutGarland()
+    if (this.factionRig.visible) this.layoutFactionRig()
   }
 
   private layoutGarland() {

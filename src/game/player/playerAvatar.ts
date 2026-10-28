@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Boat } from '@/game/entities/boat'
+import { FACTIONS, type FactionId } from '@/game/cultivation/factions'
 import { PLAYER_SKINS, playerSkinById, type PlayerSkinId } from './playerSkins'
 
 const skinTone = new THREE.MeshStandardMaterial({ color: '#e6b78c', roughness: 0.9 })
@@ -39,6 +40,9 @@ export class PlayerAvatar {
   private idleTime = 0
   private facing = 0
   private skinId: PlayerSkinId = 'angler'
+  private factionId: FactionId | null = null
+  private baseGlow = 0.08
+  private hoodGlow = 0.12
 
   constructor(scene: THREE.Scene) {
     this.group.add(this.torso)
@@ -116,17 +120,35 @@ export class PlayerAvatar {
 
   setSkin(id: PlayerSkinId) {
     this.skinId = id
-    const skin = playerSkinById(id)
-    this.bodyMat.color.set(skin.body)
-    this.bodyMat.emissive.set(skin.accent)
-    this.bodyMat.emissiveIntensity = 0.08
-    this.trimMat.color.set(skin.trim)
-    this.hoodMat.color.set(skin.hood)
-    this.hoodMat.emissive.set(skin.accent)
-    this.hoodMat.emissiveIntensity = 0.12
-    this.accentMat.color.set(skin.accent)
-    this.accentMat.emissive.set(skin.accent)
-    this.buildAccessories(skin.accessory)
+    this.buildAccessories(playerSkinById(id).accessory)
+    this.applyPalette()
+  }
+
+  /** 仙魔转职只改材质染色，不换骨骼 */
+  setFaction(id: FactionId | null) {
+    if (this.factionId === id) return
+    this.factionId = id
+    this.applyPalette()
+  }
+
+  private applyPalette() {
+    const skin = playerSkinById(this.skinId)
+    const faction = this.factionId ? FACTIONS[this.factionId] : null
+    const body = faction?.body ?? skin.body
+    const trim = faction?.trim ?? skin.trim
+    const hood = faction?.hood ?? skin.hood
+    const accent = faction?.accent ?? skin.accent
+    this.baseGlow = faction ? 0.26 : 0.08
+    this.hoodGlow = faction ? 0.34 : 0.12
+    this.bodyMat.color.set(body)
+    this.bodyMat.emissive.set(accent)
+    this.bodyMat.emissiveIntensity = this.baseGlow
+    this.trimMat.color.set(trim)
+    this.hoodMat.color.set(hood)
+    this.hoodMat.emissive.set(accent)
+    this.hoodMat.emissiveIntensity = this.hoodGlow
+    this.accentMat.color.set(accent)
+    this.accentMat.emissive.set(accent)
   }
 
   get skin() {
@@ -259,12 +281,12 @@ export class PlayerAvatar {
       this.hitTimer = Math.max(0, this.hitTimer - dt)
       const k = this.hitTimer / 0.36
       this.torso.rotation.x = -0.28 * k
-      this.bodyMat.emissiveIntensity = 0.08 + k * 0.9
-      this.hoodMat.emissiveIntensity = 0.12 + k * 0.7
+      this.bodyMat.emissiveIntensity = this.baseGlow + k * 0.9
+      this.hoodMat.emissiveIntensity = this.hoodGlow + k * 0.7
     } else {
       this.torso.rotation.x *= Math.exp(-dt * 9)
-      this.bodyMat.emissiveIntensity = 0.08
-      this.hoodMat.emissiveIntensity = 0.12
+      this.bodyMat.emissiveIntensity = this.baseGlow
+      this.hoodMat.emissiveIntensity = this.hoodGlow
     }
   }
 

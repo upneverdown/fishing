@@ -14,6 +14,7 @@ import { audio } from '@/game/audio/gameAudio'
 import { gearValue } from '@/game/gear/gear'
 import { waterAt } from '@/game/world/waters'
 import { realmAt } from '@/game/cultivation/realms'
+import { FISH_XP_BY_RARITY, fishingBlessing } from '@/game/sect/blessings'
 import type { Catch, FishingPhase } from '@/types'
 
 const MIN_CAST = 7
@@ -123,7 +124,15 @@ export class FishingSystem {
       baitWear: store.baitWear,
       zone: waterAt(this.anchor.x, this.anchor.z)?.id ?? null,
       map: store.mapZone,
+      luck: fishingBlessing(store).rareBoost,
     })
+  }
+
+  /** 抛竿落点：仙诀与阵营都会改写竿梢够到的距离 */
+  private castDistance() {
+    const store = useGameStore.getState()
+    const raw = (MIN_CAST + (MAX_CAST - MIN_CAST) * this.power) * fishingBlessing(store).castMul
+    return Math.min(MAX_CAST * 1.7, raw)
   }
 
   update(dt: number, time: number) {
@@ -145,7 +154,7 @@ export class FishingSystem {
         break
       }
       case 'charging': {
-        this.power = Math.min(1, this.power + dt / CHARGE_TIME)
+        this.power = Math.min(1, this.power + dt / (CHARGE_TIME * fishingBlessing(store).chargeMul))
         store.setPower(this.power)
         this.updateAim(time)
         if (!input.actionDown) this.cast(time)
@@ -217,7 +226,7 @@ export class FishingSystem {
 
   private updateAim(time: number) {
     const fwd = this.boat.getForward(this.boatFwd)
-    const dist = MIN_CAST + (MAX_CAST - MIN_CAST) * this.power
+    const dist = this.castDistance()
     const tx = this.boat.position.x + fwd.x * dist
     const tz = this.boat.position.z + fwd.z * dist
     const targetY = this.world.waveHeight(tx, tz, time) + 0.08
@@ -247,7 +256,7 @@ export class FishingSystem {
   private cast(time: number) {
     this.castSpeed = Math.abs(this.boat.speed)
     const fwd = this.boat.getForward(this.boatFwd)
-    const dist = MIN_CAST + (MAX_CAST - MIN_CAST) * this.power
+    const dist = this.castDistance()
     this.anchor.set(
       this.boat.position.x + fwd.x * dist,
       0,
@@ -294,7 +303,9 @@ export class FishingSystem {
     const hookSpeed = gearValue('hook', store.gear.hook)
     this.def = this.pickAt(depth)
     this.waitTime =
-      ((randRange(2.1, 5.0) + RARITY_ORDER.indexOf(this.def.rarity) * 0.12) * waitFactor) / hookSpeed
+      ((randRange(2.1, 5.0) + RARITY_ORDER.indexOf(this.def.rarity) * 0.12) * waitFactor *
+        fishingBlessing(store).waitMul) /
+      hookSpeed
     this.bobber.setBait(bait?.color ?? '#c9755d')
     store.wearBait(100 / Math.max(14, (bait?.durability ?? 90) / 2.6))
     this.bobber.setPosition(this.anchor.x, targetY, this.anchor.z)
@@ -401,6 +412,25 @@ export class FishingSystem {
     }
   }
 
+  /** 魔道掠夺：别人眼里的垃圾，于我皆是战利品 */
+  private plunderJunk(
+    store: ReturnType<typeof useGameStore.getState>,
+    junk: Catch,
+  ) {
+    const roll = Math.random()
+    if (roll < 0.5) {
+      const coins = 12 + Math.round(Math.random() * 40)
+      store.grantMoney(coins, `掠夺 ${junk.name} · 残铁换得`)
+      return
+    }
+    if (roll < 0.8) {
+      store.grantContribution(5, '掠夺所得上交魔宗 · 贡献 +5')
+      return
+    }
+    store.addRelic('血煞残晶')
+    store.toast(`垃圾里捏出一枚血煞残晶 · ${junk.name}`, 'gold')
+  }
+
   private land(time: number) {
     const store = useGameStore.getState()
     const def = this.def
@@ -408,8 +438,14 @@ export class FishingSystem {
 
     const junkChance = this.castSpeed >= 2 ? 0.5 : 0.07
     const caught = Math.random() < junkChance ? createJunk() : createCatch(def)
+    const blessing = fishingBlessing(store)
+    if (caught.junk && blessing.junkLoot) this.plunderJunk(store, caught)
     const added = store.addCatch(caught)
     if (!caught.junk) this.grantBoon(def)
+    if (!caught.junk && added && blessing.absorbMul > 0) {
+      const xp = Math.round(FISH_XP_BY_RARITY[caught.rarity] * blessing.absorbMul)
+      if (store.gainCultivation(xp, '吸星大法')) store.toast('修为圆满 · 可渡下一次天劫', 'gold')
+    }
     store.setFight(null)
     store.setBite(false)
     store.setPhase('landed')
