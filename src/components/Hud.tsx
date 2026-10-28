@@ -6,6 +6,7 @@ import {
   Compass,
   Droplets,
   Fish,
+  Gem,
   Leaf,
   MapPinned,
   ScanEye,
@@ -180,6 +181,8 @@ export function Hud() {
   const bagCount = useGameStore((s) => s.bag.length)
   const capacity = useGameStore((s) => bagCapacity(s))
   const zone = useGameStore((s) => s.zone)
+  const immortalJade = useGameStore((s) => s.immortalJade)
+  const celestialZone = useGameStore((s) => s.mapZone === 'celestial')
   const phase = useGameStore((s) => s.phase)
   const underwater = useGameStore((s) => s.underwater)
   const season = useGameStore((s) => s.season)
@@ -272,6 +275,16 @@ export function Hud() {
               </span>
               <span className="tnum text-[13px] font-semibold text-gold">¥{money.toLocaleString('zh-CN')}</span>
             </div>
+
+            {(celestialZone || immortalJade > 0) && (
+              <div className="glass flex items-center gap-2 rounded-full py-1 pl-1.5 pr-3">
+                <span className="grid size-6 place-items-center rounded-full bg-[#ffe6b0]/15 text-[#ffe0a0]">
+                  <Gem className="size-3.5" />
+                </span>
+                <span className="tnum text-[13px] font-semibold text-[#ffe6b0]">{immortalJade}</span>
+                <span className="text-[10px] tracking-[0.16em] text-foam/45">仙玉</span>
+              </div>
+            )}
 
             <button
               type="button"

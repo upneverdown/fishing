@@ -53,7 +53,7 @@ export const REALMS: RealmDef[] = [
     id: 'yuanying',
     name: '元婴期',
     short: '元婴',
-    requiredXp: Number.POSITIVE_INFINITY,
+    requiredXp: 6000,
     attackMul: 1.36,
     hpMul: 1.36,
     speedMul: 1.3,
@@ -61,7 +61,26 @@ export const REALMS: RealmDef[] = [
     glow: 'rgba(226,200,255,0.68)',
     motto: '元婴出窍，万剑归宗',
   },
+  {
+    id: 'tianren',
+    name: '天人境',
+    short: '天人',
+    requiredXp: Number.POSITIVE_INFINITY,
+    attackMul: 1.62,
+    hpMul: 1.62,
+    speedMul: 1.46,
+    color: '#ffd98a',
+    glow: 'rgba(255,217,138,0.72)',
+    motto: '飞升天界，云海任游',
+  },
 ]
+
+/** 修为此境界圆满后，下一次雷劫即是飞升之劫 */
+export const ASCENSION_REALM_INDEX = REALMS.length - 2
+
+export function isAscensionRealm(realmIndex: number) {
+  return (realmIndex | 0) === ASCENSION_REALM_INDEX
+}
 
 export const LAST_REALM_INDEX = REALMS.length - 1
 
@@ -82,7 +101,9 @@ export interface CoreSpec {
 }
 
 const CORE_BY_KIND: Record<string, CoreSpec> = {
+  thunderdragon: { name: '雷龙仙丹', xp: 420, color: '#ffe6a8', size: 0.74 },
   dragon: { name: '龙族内丹', xp: 200, color: '#f6d477', size: 0.62 },
+  stormeel: { name: '雷鳗内丹', xp: 220, color: '#bfe9ff', size: 0.5 },
   turtle: { name: '玄龟内丹', xp: 140, color: '#9fe0b4', size: 0.52 },
   whale: { name: '鲸落内丹', xp: 110, color: '#8ecbff', size: 0.46 },
   shark: { name: '鲨丹', xp: 60, color: '#b8d7de', size: 0.36 },
@@ -144,6 +165,8 @@ export function skillUnlocked(skill: SkillDef, realmIndex: number) {
 
 /** 首领的境界层级，用于境界压制 */
 export function creatureRealm(kind: string): number {
+  if (kind === 'thunderdragon') return 4
+  if (kind === 'stormeel') return 3
   if (kind === 'dragon') return 2
   if (kind === 'turtle' || kind === 'whale') return 1
   return 0

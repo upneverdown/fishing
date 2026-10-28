@@ -13,6 +13,7 @@ import { clamp, lerp, randRange } from '@/game/utils/math'
 import { audio } from '@/game/audio/gameAudio'
 import { gearValue } from '@/game/gear/gear'
 import { waterAt } from '@/game/world/waters'
+import { realmAt } from '@/game/cultivation/realms'
 import type { Catch, FishingPhase } from '@/types'
 
 const MIN_CAST = 7
@@ -121,6 +122,7 @@ export class FishingSystem {
       bait: store.baitId,
       baitWear: store.baitWear,
       zone: waterAt(this.anchor.x, this.anchor.z)?.id ?? null,
+      map: store.mapZone,
     })
   }
 
@@ -407,6 +409,7 @@ export class FishingSystem {
     const junkChance = this.castSpeed >= 2 ? 0.5 : 0.07
     const caught = Math.random() < junkChance ? createJunk() : createCatch(def)
     const added = store.addCatch(caught)
+    if (!caught.junk) this.grantBoon(def)
     store.setFight(null)
     store.setBite(false)
     store.setPhase('landed')
@@ -435,6 +438,30 @@ export class FishingSystem {
     }
     if (caught.junk && added) {
       gameEvents.emit('catch:junk', { defId: caught.defId, speed: this.castSpeed })
+    }
+  }
+
+  /** 天界渔获的即时馈赠：仙玉、灌顶修为，以及会引来雷暴的两种意外 */
+  private grantBoon(def: FishDef) {
+    if (def.map !== 'celestial') return
+    const store = useGameStore.getState()
+    if (def.jade) store.grantJade(def.jade, `${def.name}化作仙玉`)
+
+    let xp = def.xp ?? 0
+    if (def.boon === 'xpPercent') {
+      const need = realmAt(store.realm).requiredXp
+      xp = Number.isFinite(need) ? Math.round(need * 0.5) : 3000
+    }
+    if (xp && store.gainCultivation(xp, `${def.name}灌顶`)) {
+      gameEvents.emit('cultivation:ready', { source: def.name })
+    }
+
+    if (def.boon === 'relic') {
+      store.addRelic('玄武甲')
+      store.toast('玄冰仙龟留下一片玄武甲 · 已收入行囊', 'gold')
+    }
+    if (def.boon === 'summonEel') {
+      gameEvents.emit('celestial:summon', { kind: 'stormeel', x: this.anchor.x, z: this.anchor.z })
     }
   }
 

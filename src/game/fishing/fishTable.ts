@@ -1,4 +1,5 @@
-import type { BaitId, Catch, CatchMethod, DayPeriod, Rarity, SeasonId, WaterId } from '@/types'
+import type { BaitId, Catch, CatchMethod, DayPeriod, MapZone, Rarity, SeasonId, WaterId } from '@/types'
+import { CELESTIAL_FISH } from './celestialTable'
 
 export interface RarityMeta {
   label: string
@@ -33,9 +34,19 @@ export interface FishDef {
   periods?: DayPeriod[]
   baits?: Partial<Record<BaitId, number>>
   zones?: WaterId[]
+  /** 缺省即凡间物种 */
+  map?: MapZone
+  /** 钓起即刻灌顶的修为，不走卖鱼回收 */
+  xp?: number
+  /** 钓起即刻获得的天界货币 */
+  jade?: number
+  /** 额外馈赠：按比例灌顶 / 引出首领 / 掉落特殊材料 */
+  boon?: 'xpPercent' | 'summonEel' | 'relic'
+  /** 材质颜色随时间轮转（九色锦鲤） */
+  prism?: boolean
 }
 
-export const FISH: FishDef[] = [
+const MORTAL_FISH: FishDef[] = [
   {
     id: 'bleak',
     name: '白条',
@@ -418,6 +429,8 @@ export const FISH: FishDef[] = [
   },
 ]
 
+export const FISH: FishDef[] = [...MORTAL_FISH, ...CELESTIAL_FISH]
+
 const FISH_BY_ID = new Map(FISH.map((f) => [f.id, f]))
 
 export function fishById(id: string) {
@@ -430,6 +443,7 @@ export interface FishPickContext {
   bait?: BaitId
   baitWear?: number
   zone?: WaterId | null
+  map?: MapZone
 }
 
 export function baitPreference(def: FishDef, bait?: BaitId) {
@@ -438,8 +452,9 @@ export function baitPreference(def: FishDef, bait?: BaitId) {
 }
 
 export function pickFish(depth: number, ctx: FishPickContext = {}): FishDef {
-  const pool = FISH.filter((f) => depth >= f.minDepth && depth <= f.maxDepth)
-  const candidates = pool.length ? pool : FISH.slice(0, 3)
+  const inMap = FISH.filter((f) => (f.map ?? 'mortal') === (ctx.map ?? 'mortal'))
+  const pool = inMap.filter((f) => depth >= f.minDepth && depth <= f.maxDepth)
+  const candidates = pool.length ? pool : inMap.slice(0, 3)
   const freshness = ctx.baitWear === undefined ? 1 : 0.35 + (ctx.baitWear / 100) * 0.65
   let total = 0
   const weights = candidates.map((f) => {

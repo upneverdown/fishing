@@ -1,4 +1,4 @@
-import { Check, Coins, Ruler, Scale, Sparkles, Waves } from 'lucide-react'
+import { Check, Coins, Gem, Ruler, Scale, Sparkles, Waves } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,19 @@ import { marketQuote } from '@/game/economy/market'
 import { DAY_PERIOD_LABEL, SEASONS } from '@/game/world/seasons'
 import { bagCapacity, useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
+
+const MIST = [
+  { left: '6%', bottom: '2%', width: 138, height: 76, delay: '0s' },
+  { left: '42%', bottom: '-4%', width: 182, height: 92, delay: '1.5s' },
+  { left: '70%', bottom: '6%', width: 124, height: 68, delay: '2.9s' },
+]
+
+const MOTES = [
+  { left: '14%', top: '62%', delay: '0.1s' },
+  { left: '34%', top: '74%', delay: '0.9s' },
+  { left: '58%', top: '66%', delay: '1.7s' },
+  { left: '78%', top: '78%', delay: '2.4s' },
+]
 
 export function FishCardDialog() {
   const card = useGameStore((s) => s.card)
@@ -39,6 +52,15 @@ export function FishCardDialog() {
     if (quote.cabinBonus > 1) bonusBits.push(`船舱 +${Math.round((quote.cabinBonus - 1) * 100)}%`)
   }
   const seasonsText = def?.seasons?.map((s) => SEASONS[s].name).join(' · ')
+  const celestialCatch = def?.map === 'celestial'
+  const boonBits: string[] = []
+  if (celestialCatch && def) {
+    if (def.xp) boonBits.push(`修为 +${def.xp}`)
+    if (def.jade) boonBits.push(`仙玉 +${def.jade}`)
+    if (def.boon === 'xpPercent') boonBits.push('半阶灌顶')
+    if (def.boon === 'relic') boonBits.push('玄武甲')
+    if (def.boon === 'summonEel') boonBits.push('雷暴将至')
+  }
   const periodsText = def?.periods?.map((p) => DAY_PERIOD_LABEL[p]).join(' · ')
   const baitText = def
     ? BAITS.filter((b) => b.favors[def.id])
@@ -53,12 +75,22 @@ export function FishCardDialog() {
       {card && meta && (
         <DialogContent
           showClose={false}
-          className="max-h-[92dvh] w-[calc(100%-2rem)] max-w-[380px] overflow-y-auto rounded-2xl border-none bg-[#f3ecdc] p-0 text-[#1c2d29] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)]"
+          className={cn(
+            'max-h-[92dvh] w-[calc(100%-2rem)] max-w-[380px] overflow-y-auto rounded-2xl p-0 text-[#1c2d29]',
+            celestialCatch
+              ? 'bg-[linear-gradient(168deg,#fffaf0,#ffefcf_52%,#f6e9cd)] shadow-[0_0_0_1px_rgba(206,152,74,0.5),0_0_54px_-6px_rgba(255,196,104,0.42),0_40px_120px_-30px_rgba(0,0,0,0.9)]'
+              : 'border-none bg-[#f3ecdc] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)]',
+          )}
         >
           <div className="relative">
             <div className="flex items-center justify-between px-5 pt-4">
-              <span className="text-[9.5px] font-semibold uppercase tracking-[0.32em] text-[#8b988f]">
-                Tidewater catch
+              <span
+                className={cn(
+                  'text-[9.5px] font-semibold uppercase tracking-[0.32em]',
+                  celestialCatch ? 'text-[#a87b21]' : 'text-[#8b988f]',
+                )}
+              >
+                {celestialCatch ? '天界渔获 · 仙气未散' : 'Tidewater catch'}
               </span>
               <span className="tnum text-[10px] tracking-wide text-[#8b988f]">
                 {new Date(card.caughtAt).toLocaleTimeString('zh-CN', {
@@ -78,6 +110,31 @@ export function FishCardDialog() {
                 style={{ background: `linear-gradient(90deg, transparent, ${meta.color}66, transparent)` }}
               />
               <FishArt rarity={card.rarity} defId={card.defId} className="relative h-36 w-full" />
+              {celestialCatch && (
+                <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                  {MIST.map((m) => (
+                    <span
+                      key={m.delay}
+                      className="immortal-mist"
+                      style={{
+                        left: m.left,
+                        bottom: m.bottom,
+                        width: m.width,
+                        height: m.height,
+                        animationDelay: m.delay,
+                      }}
+                    />
+                  ))}
+                  {MOTES.map((m) => (
+                    <span
+                      key={m.delay}
+                      className="immortal-mote"
+                      style={{ left: m.left, top: m.top, animationDelay: m.delay }}
+                    />
+                  ))}
+                  <span className="immortal-halo absolute inset-x-0 bottom-0 h-10 bg-[linear-gradient(to_top,rgba(255,214,138,0.55),transparent)]" />
+                </div>
+              )}
               <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[#f7f1e3]/85 py-0.5 pl-2 pr-2.5 backdrop-blur-sm">
                 <span className="size-1.5 rounded-full" style={{ background: meta.color }} />
                 <span className="text-[10.5px] font-semibold" style={{ color: ink }}>
@@ -96,7 +153,14 @@ export function FishCardDialog() {
               <DialogTitle className="text-[27px] font-bold leading-none tracking-[0.1em] text-[#1b2c28]">
                 {card.name}
               </DialogTitle>
-              <span className="text-[10px] tracking-[0.18em] text-[#98a49c]">刚出水</span>
+              <span
+                className={cn(
+                  'text-[10px] tracking-[0.18em]',
+                  celestialCatch ? 'text-[#b98a34]' : 'text-[#98a49c]',
+                )}
+              >
+                {celestialCatch ? '踏云而出' : '刚出水'}
+              </span>
             </div>
             <DialogDescription className="mt-2 px-5 text-[12px] leading-relaxed text-[#5e6d66]">
               {card.desc}
@@ -125,11 +189,27 @@ export function FishCardDialog() {
                     偏爱 · {baitText}
                   </span>
                 )}
-                {def && (
-                  <span className="tnum rounded-full bg-[#1b2c28]/6 px-2 py-0.5 text-[9.5px] text-[#68766f]">
-                    水深 · {def.minDepth.toFixed(1)}–{def.maxDepth.toFixed(1)} m
+                {celestialCatch ? (
+                  <span className="flex items-center gap-1 rounded-full bg-[#a87b21]/12 px-2 py-0.5 text-[9.5px] text-[#8c6118]">
+                    <Waves className="size-3" />
+                    云海 · 无底
                   </span>
+                ) : (
+                  def && (
+                    <span className="tnum rounded-full bg-[#1b2c28]/6 px-2 py-0.5 text-[9.5px] text-[#68766f]">
+                      水深 · {def.minDepth.toFixed(1)}–{def.maxDepth.toFixed(1)} m
+                    </span>
+                  )
                 )}
+                {boonBits.map((b) => (
+                  <span
+                    key={b}
+                    className="flex items-center gap-1 rounded-full bg-[#ffd06a]/28 px-2 py-0.5 text-[9.5px] font-semibold text-[#8c6118]"
+                  >
+                    <Gem className="size-3" />
+                    {b}
+                  </span>
+                ))}
               </div>
 
             <div className="mx-5 mt-3.5 grid grid-cols-3 divide-x divide-[#1b2c28]/10 rounded-lg border border-[#1b2c28]/12 bg-white/40 py-2.5">
@@ -175,17 +255,24 @@ export function FishCardDialog() {
               )}
             >
               {cardAdded
-                ? `已收入鱼篓 · ${bagCount}/${capacity} · 划回老码头就能卖个好价钱`
+                ? celestialCatch
+                  ? `已收入鱼篓 · ${bagCount}/${capacity} · 仙玉当场落袋，鱼带回凡间码头还能卖个好价钱`
+                  : `已收入鱼篓 · ${bagCount}/${capacity} · 划回老码头就能卖个好价钱`
                 : '鱼篓已经塞满了，这条鱼只能放回水里'}
             </div>
 
             <div className="px-5 pb-5 pt-3.5">
               <Button
                 onClick={closeCard}
-                className="h-11 w-full rounded-lg bg-[#1b2c28] text-[13px] font-semibold tracking-[0.08em] text-[#f4eddc] hover:bg-[#243832]"
+                className={cn(
+                  'h-11 w-full rounded-lg text-[13px] font-semibold tracking-[0.08em]',
+                  celestialCatch
+                    ? 'bg-[linear-gradient(100deg,#c9962f,#e8c56d_55%,#c9962f)] text-[#2c1e05] hover:brightness-105'
+                    : 'bg-[#1b2c28] text-[#f4eddc] hover:bg-[#243832]',
+                )}
               >
                 <Check className="size-4" />
-                {cardAdded ? '收好，继续钓鱼' : '知道了'}
+                {cardAdded ? (celestialCatch ? '仙气收进篓里' : '收好，继续钓鱼') : '知道了'}
               </Button>
             </div>
           </div>

@@ -30,6 +30,7 @@ class InputController {
   private skillSwordPress = false
   private achievementsPress = false
   private crewPress = false
+  private zonePress = false
   private slotPress = 0
   private joy = { x: 0, y: 0, active: false }
   private canvas: HTMLCanvasElement | null = null
@@ -131,6 +132,7 @@ class InputController {
     if (key === 'r') this.skillSwordPress = true
     if (key === 'n') this.achievementsPress = true
     if (key === 'm') this.crewPress = true
+    if (key === 'p') this.zonePress = true
     if (key === '1') this.slotPress = 1
     if (key === '2') this.slotPress = 2
     if (key === '3') this.slotPress = 3
@@ -310,6 +312,12 @@ class InputController {
     return pressed
   }
 
+  consumeZone() {
+    const pressed = this.zonePress
+    this.zonePress = false
+    return pressed
+  }
+
   consumeLook() {
     const dx = this.lookX
     const dy = this.lookY
@@ -417,6 +425,7 @@ class InputController {
     this.skillSwordPress = false
     this.achievementsPress = false
     this.crewPress = false
+    this.zonePress = false
     this.slotPress = 0
     this.spaceHeld = false
     this.touchVertical = 0
@@ -452,6 +461,7 @@ class InputController {
     this.skillSwordPress = false
     this.achievementsPress = false
     this.crewPress = false
+    this.zonePress = false
     this.slotPress = 0
     this.clickPoint = null
   }

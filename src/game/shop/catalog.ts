@@ -8,7 +8,8 @@ export type BoatSkinId =
   | 'icebreaker'
   | 'pirate'
   | 'dragonboat'
-export type RodSkinId = 'classic' | 'tide' | 'ember' | 'aurora'
+  | 'skyboat'
+export type RodSkinId = 'classic' | 'tide' | 'ember' | 'aurora' | 'immortal'
 export type DecorationId = 'figurehead' | 'garland' | 'flag' | 'crate'
 
 export type ShopKind = 'boat' | 'rod' | 'decoration'
@@ -19,6 +20,12 @@ export interface BoatStyle {
   title: string
   tagline: string
   price: number
+  /** 仙玉计价：天界之物不用凡间金币 */
+  jade?: number
+  /** 需要飞升天界后才可购买 */
+  celestialOnly?: boolean
+  /** 可在云海之上离云飞行 */
+  flying?: boolean
   speed: number
   turn: number
   accent: string
@@ -38,6 +45,7 @@ export interface RodSkin {
   name: string
   tagline: string
   price: number
+  jade?: number
   rod: string
   grip: string
   reel: string
@@ -182,6 +190,27 @@ export const BOAT_STYLES: BoatStyle[] = [
     waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
     hidden: true,
   },
+  {
+    id: 'skyboat',
+    name: '凌虚号',
+    title: '仙舟',
+    tagline: '云木雕成舟骨，玉盏引路，划起来船底不沾水，只在云海之上三寸。',
+    price: 0,
+    jade: 120,
+    celestialOnly: true,
+    flying: true,
+    speed: 1.52,
+    turn: 1.08,
+    accent: '#ffd98a',
+    tier: 5,
+    classLabel: '仙舟',
+    capacity: 34,
+    gearCap: 3,
+    facilitySlots: 4,
+    durability: 300,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+  },
 ]
 
 export const ROD_SKINS: RodSkin[] = [
@@ -233,6 +262,19 @@ export const ROD_SKINS: RodSkin[] = [
     glow: '#6fa8ff',
     glowIntensity: 0.7,
   },
+  {
+    id: 'immortal',
+    name: '云梭',
+    tagline: '天界玉竹炼成的竿身，甩出去像把一道虹抛进云海。',
+    price: 0,
+    jade: 48,
+    rod: '#e9dcc0',
+    grip: '#b8955e',
+    reel: '#ffe6a8',
+    accent: '#fff3cf',
+    glow: '#ffd98a',
+    glowIntensity: 0.9,
+  },
 ]
 
 export const DECORATIONS: Decoration[] = [
@@ -271,14 +313,30 @@ export interface ShopEntry {
   kind: ShopKind
   name: string
   price: number
+  jade?: number
+  celestialOnly?: boolean
 }
 
 const ENTRY_MAP = new Map<string, ShopEntry>()
 for (const item of BOAT_STYLES) {
-  ENTRY_MAP.set(item.id, { id: item.id, kind: 'boat', name: item.name, price: item.price })
+  ENTRY_MAP.set(item.id, {
+    id: item.id,
+    kind: 'boat',
+    name: item.name,
+    price: item.price,
+    jade: item.jade,
+    celestialOnly: item.celestialOnly,
+  })
 }
 for (const item of ROD_SKINS) {
-  ENTRY_MAP.set(item.id, { id: item.id, kind: 'rod', name: item.name, price: item.price })
+  ENTRY_MAP.set(item.id, {
+    id: item.id,
+    kind: 'rod',
+    name: item.name,
+    price: item.price,
+    jade: item.jade,
+    celestialOnly: Boolean(item.jade),
+  })
 }
 for (const item of DECORATIONS) {
   ENTRY_MAP.set(item.id, { id: item.id, kind: 'decoration', name: item.name, price: item.price })
@@ -308,6 +366,10 @@ export function boatGearCap(id: BoatSkinId): number {
 
 export function boatFacilitySlots(id: BoatSkinId): number {
   return boatStyle(id).facilitySlots
+}
+
+export function boatCanFly(id: BoatSkinId): boolean {
+  return boatStyle(id).flying === true
 }
 
 export function isRodSkin(id: string): id is RodSkinId {

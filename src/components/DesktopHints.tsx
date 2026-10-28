@@ -30,14 +30,23 @@ const HINTS = [
 export function DesktopHints() {
   const boss = useGameStore((s) => s.boss)
   const combatCamera = useGameStore((s) => s.combatCamera)
+  const ascended = useGameStore((s) => s.ascended)
+  const celestial = useGameStore((s) => s.mapZone === 'celestial')
   const hints = HINTS.map((hint) =>
     hint.keys[0] === 'V'
       ? {
           ...hint,
-          label: boss ? (combatCamera ? '解除战斗视角' : '锁定战斗视角') : '潜入水下',
+          label: celestial
+            ? '天界无需下潜'
+            : boss
+              ? combatCamera
+                ? '解除战斗视角'
+                : '锁定战斗视角'
+              : '潜入水下',
         }
       : hint,
   )
+  if (ascended) hints.push({ keys: ['P'], label: celestial ? '传送回凡间' : '传送至天界' })
 
   return (
     <div className="pointer-events-none absolute bottom-4 left-5 z-20 hidden sm:block">

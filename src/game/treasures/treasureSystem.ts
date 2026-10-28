@@ -424,6 +424,11 @@ export class TreasureSystem {
     useGameStore.getState().setChestPrompt(null)
   }
 
+  /** 天界云海里没有凡间的漂流木桶与沉船 */
+  setVisible(visible: boolean) {
+    this.root.visible = visible
+  }
+
   private disposeObject(object: THREE.Object3D) {
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return

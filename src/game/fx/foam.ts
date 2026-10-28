@@ -80,6 +80,12 @@ export class Foam {
     return particle
   }
 
+  /** 天界云海用金色水花，凡间恢复原本的清透白 */
+  setTint(particle: string, ripple: string) {
+    for (const p of this.particles) p.mesh.material.color.set(particle)
+    for (const r of this.ripples) r.mesh.material.color.set(ripple)
+  }
+
   splash(x: number, z: number, amount = 8, power = 1) {
     for (let i = 0; i < amount; i++) {
       const p = this.next()

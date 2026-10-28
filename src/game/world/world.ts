@@ -117,6 +117,35 @@ const DOOM_HORIZON = new THREE.Color('#6b1a1c')
 const DOOM_HEMI = new THREE.Color('#8a2c2a')
 const DOOM_SUN = new THREE.Color('#b0483a')
 
+function celestialLook(): SeasonLook {
+  return {
+    zenith: new THREE.Color('#ffe9b8'),
+    horizon: new THREE.Color('#ffb45a'),
+    skySun: new THREE.Color('#fff3c4'),
+    fog: new THREE.Color('#ffcf94'),
+    waterShallow: new THREE.Color('#fff6e0'),
+    waterDeep: new THREE.Color('#d8a45c'),
+    waterScatter: new THREE.Color('#ffbe6a'),
+    waterSkyZenith: new THREE.Color('#ffc978'),
+    waterSkyHorizon: new THREE.Color('#ffe6bd'),
+    hemiSky: new THREE.Color('#ffe3b0'),
+    hemiGround: new THREE.Color('#c98fb8'),
+    fill: new THREE.Color('#ffefc0'),
+    sun: new THREE.Color('#ffe9b0'),
+    hemiIntensity: 1.12,
+    fillIntensity: 0.7,
+    sunIntensity: 2.7,
+    exposure: 1.0,
+    waveScale: 0.42,
+    fogNear: 58,
+    fogFar: 380,
+    sunOffset: new THREE.Vector3(-24, 46, -62),
+  }
+}
+
+const CELESTIAL_LOOK = celestialLook()
+const CELESTIAL_DEPTH = 3.6
+
 function lightningTexture() {
   const canvas = document.createElement('canvas')
   canvas.width = 256
@@ -176,14 +205,21 @@ export class World {
   private seasonId: SeasonId = 'spring'
   private look: SeasonLook
   private target: SeasonLook
+  private seasonTarget: SeasonLook
   private underwater = false
   private time = 0
   private sunDir = new THREE.Vector3()
+  private celestial = false
+  private mortalProps: THREE.Object3D[] = []
+  private celestialSurface: ((x: number, z: number, time: number) => number) | null = null
+  private hover = 0
+  private hoverTarget = 0
 
   constructor(private scene: THREE.Scene) {
     const spring = lookFrom(SEASONS.spring)
     this.look = lookFrom(SEASONS.spring)
     this.target = spring
+    this.seasonTarget = spring
 
     scene.background = new THREE.Color(SEASONS.spring.sky.horizon)
     scene.fog = new THREE.Fog(SEASONS.spring.sky.fog, SEASONS.spring.fog.near, SEASONS.spring.fog.far)
@@ -205,11 +241,13 @@ export class World {
     this.water.setFogRange(scene.fog.near, scene.fog.far)
     scene.add(this.water.mesh)
 
-    scene.add(createDock(this.colliders))
+    const dock = createDock(this.colliders)
+    scene.add(dock)
     const forest = createForest()
     scene.add(forest.group)
     this.foliage = forest.foliage
-    scene.add(createRocks(this.colliders))
+    const rocks = createRocks(this.colliders)
+    scene.add(rocks)
     const lilies = createLilies()
     scene.add(lilies.group)
     this.lilies = lilies.mesh
@@ -252,6 +290,18 @@ export class World {
 
     this.foam = new Foam(scene, (x, z) => this.waveHeight(x, z, this.time))
 
+    this.mortalProps = [
+      this.terrain,
+      dock,
+      forest.group,
+      rocks,
+      lilies.group,
+      waterfall.group,
+      this.water.mesh,
+      this.ice.group,
+      ...this.buoys.map((buoy) => buoy.group),
+    ]
+
     this.applySeasonTargets()
     this.applyScene(new THREE.Vector3())
   }
@@ -286,8 +336,11 @@ export class World {
   setSeason(season: SeasonId, immediate = false) {
     if (season === this.seasonId && !immediate) return
     this.seasonId = season
-    this.target = lookFrom(SEASONS[season])
-    if (immediate) copyLook(this.look, this.target)
+    this.seasonTarget = lookFrom(SEASONS[season])
+    if (!this.celestial) {
+      this.target = this.seasonTarget
+      if (immediate) copyLook(this.look, this.target)
+    }
     this.applySeasonTargets()
   }
 
@@ -296,15 +349,54 @@ export class World {
     paintTerrain(this.terrain, profile.terrain)
     recolorFoliage(this.foliage, profile.foliage)
     recolorLilies(this.lilies, profile.lilies)
-    this.lilies.visible = this.seasonId !== 'winter'
-    this.ice.group.visible = this.seasonId === 'winter' && profile.ice > 0
+    this.lilies.visible = this.seasonId !== 'winter' && !this.celestial
+    this.ice.group.visible = this.seasonId === 'winter' && profile.ice > 0 && !this.celestial
+  }
+
+  /** 天界模式：金色天象、隐藏凡间景物、云海取代海面 */
+  setCelestial(on: boolean, immediate = false) {
+    if (on === this.celestial) return
+    this.celestial = on
+    this.target = on ? CELESTIAL_LOOK : this.seasonTarget
+    if (immediate) copyLook(this.look, this.target)
+    for (const prop of this.mortalProps) prop.visible = !on
+    this.colliders.enabled = !on
+    this.foam.setTint(
+      on ? '#ffd98a' : '#f4fffb',
+      on ? '#ffeec2' : '#e8f8f2',
+    )
+    this.hoverTarget = 0
+    this.updateSkyVisible()
+    this.applySeasonTargets()
+  }
+
+  get isCelestial() {
+    return this.celestial
+  }
+
+  setCelestialSurface(surface: ((x: number, z: number, time: number) => number) | null) {
+    this.celestialSurface = surface
+  }
+
+  /** 仙舟离云高度，飞行时船体整体抬升；snap 用于过场里逐帧精确跟高 */
+  setHover(altitude: number, snap = false) {
+    this.hoverTarget = THREE.MathUtils.clamp(altitude, 0, 90)
+    if (snap) this.hover = this.hoverTarget
+  }
+
+  get hoverAltitude() {
+    return this.hover
   }
 
   setUnderwater(underwater: boolean) {
     this.underwater = underwater
-    this.sky.visible = !underwater
+    this.updateSkyVisible()
     if (underwater) this.diveLight.intensity = 2.4
     else this.diveLight.intensity = 0
+  }
+
+  private updateSkyVisible() {
+    this.sky.visible = !this.underwater && !this.celestial
   }
 
   setDiveLightPosition(position: THREE.Vector3) {
@@ -472,6 +564,7 @@ export class World {
     this.time = time
     this.storm += (this.stormTarget - this.storm) * (1 - Math.exp(-dt * 1.7))
     this.doom += (this.doomTarget - this.doom) * (1 - Math.exp(-dt * 2.6))
+    this.hover += (this.hoverTarget - this.hover) * (1 - Math.exp(-dt * 2.4))
     this.lightningFlash = Math.max(0, this.lightningFlash - dt * 2.6)
     this.lerpLook(dt)
     this.applyScene(center)
@@ -522,11 +615,22 @@ export class World {
   }
 
   waveHeight(x: number, z: number, time: number) {
-    return this.water.waveHeight(x, z, time)
+    const surface =
+      this.celestial && this.celestialSurface
+        ? this.celestialSurface(x, z, time)
+        : this.water.waveHeight(x, z, time)
+    return surface + this.hover
   }
 
   depthAt(x: number, z: number) {
-    return depthAt(x, z)
+    return this.celestial ? CELESTIAL_DEPTH : depthAt(x, z)
+  }
+
+  /** 不含抬升高度的真实浪面，供水体接触与粒子使用 */
+  rawWaveHeight(x: number, z: number, time: number) {
+    return this.celestial && this.celestialSurface
+      ? this.celestialSurface(x, z, time)
+      : this.water.waveHeight(x, z, time)
   }
 
   updateFoam(dt: number) {

@@ -17,6 +17,7 @@ const DESKTOP_CONTROLS = [
   { keys: 'J / K', text: '挥刀劈砍 / 鱼枪射击' },
   { keys: 'Q · E · R', text: '御水诀 / 火龙术 / 万剑归宗（随境界解锁）' },
   { keys: 'V / F', text: '潜入水下 / 切换视角 · 吸收内丹' },
+  { keys: 'P', text: '飞升之后 · 凡间与天界之间传送' },
 ]
 
 const TOUCH_CONTROLS = [

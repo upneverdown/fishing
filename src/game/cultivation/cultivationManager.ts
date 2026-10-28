@@ -8,6 +8,7 @@ import { clamp } from '@/game/utils/math'
 import {
   SKILLS,
   coreSpec,
+  isAscensionRealm,
   realmAt,
   realmAttackMul,
   skillUnlocked,
@@ -166,13 +167,15 @@ export class CultivationManager {
   private boltsFired = 0
   private shake = 0
   private tribFrom = ''
+
+  private tribAscend = false
   private tribTo = ''
   private tribColor = '#ffffff'
 
   private coreTexture = glowTexture()
   private boltSheet = boltTexture()
   private emberTexture = glowTexture('rgba(255,246,214,0.98)', 'rgba(255,150,60,0.6)')
-  private unsubscribe: (() => void) | null = null
+  private unsubscribes: (() => void)[] = []
 
   constructor(
     private scene: THREE.Scene,
@@ -180,7 +183,10 @@ export class CultivationManager {
     private creatures: CreatureSystem,
   ) {
     scene.add(this.group)
-    this.unsubscribe = gameEvents.on('boss:core', ({ kind, x, z }) => this.spawnCore(kind, x, z))
+    this.unsubscribes.push(
+      gameEvents.on('boss:core', ({ kind, x, z }) => this.spawnCore(kind, x, z)),
+      gameEvents.on('cultivation:ready', () => this.requestTribulation()),
+    )
   }
 
   get tribulating() {
@@ -321,6 +327,7 @@ export class CultivationManager {
     this.tribFrom = from.name
     this.tribTo = to.name
     this.tribColor = to.color
+    this.tribAscend = isAscensionRealm(state.realm)
     state.setInputLocked(true)
     state.setTribulation({
       phase: 'gathering',
@@ -346,6 +353,7 @@ export class CultivationManager {
     const definition = TRIBULATION_STEPS[this.step]
     if (definition.phase === 'ascended') {
       state.applyBreakthrough()
+      if (this.tribAscend) state.markAscended()
       this.world.setDoom(0)
       state.flashSky()
     }
@@ -370,6 +378,10 @@ export class CultivationManager {
     state.setTribulation(null)
     state.setInputLocked(false)
     this.unlockToast()
+    if (this.tribAscend) {
+      this.tribAscend = false
+      gameEvents.emit('ascension:gate', { at: this.clock })
+    }
   }
 
   private unlockToast() {
@@ -898,8 +910,8 @@ export class CultivationManager {
   }
 
   dispose() {
-    this.unsubscribe?.()
-    this.unsubscribe = null
+    for (const off of this.unsubscribes) off()
+    this.unsubscribes.length = 0
     for (const core of this.cores) this.remove(core.group)
     this.cores.length = 0
     for (const surge of this.surges) this.remove(surge.group)

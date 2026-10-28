@@ -1,3 +1,4 @@
+import type { MapZone } from '@/types'
 import type { BoatSkinId } from '@/game/shop/catalog'
 
 export interface GameEventMap {
@@ -12,6 +13,11 @@ export interface GameEventMap {
   'crew:catch': { crewName: string; fishName: string; coins: number }
   'boat:collide': { power: number }
   'boss:core': { kind: string; name: string; x: number; z: number }
+  'cultivation:ready': { source: string }
+  'celestial:summon': { kind: string; x: number; z: number }
+  'zone:changed': { zone: MapZone }
+  'ascension:gate': { at: number }
+  'ascension:done': { to: MapZone }
 }
 
 type Handler<T> = (payload: T) => void

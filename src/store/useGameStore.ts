@@ -12,6 +12,7 @@ import type {
   FishingPhase,
   FightState,
   GearId,
+  MapZone,
   NavSnapshot,
   Quality,
   RadarContact,
@@ -216,6 +217,15 @@ export interface SkillCdHud {
   needRealm: string
 }
 
+export interface AscensionHud {
+  /** gate=天河已开待驶入 · sailing=逆流升空中 · crossing=穿云过渡 */
+  phase: 'gate' | 'sailing' | 'crossing'
+  /** 沿通天河道的进度 0~1 */
+  progress: number
+  /** 船身距原本水面的高度 */
+  altitude: number
+}
+
 interface PersistedProgress {
   money: number
   bag: Catch[]
@@ -266,6 +276,12 @@ interface PersistedProgress {
   realm: number
   cultivationXp: number
   cultivationCores: number
+  /** 当前所在地图：凡界海湾 / 天界云海 */
+  mapZone: MapZone
+  /** 天界专属货币，只用于仙舟与仙家物件 */
+  immortalJade: number
+  /** 是否已完成飞升（决定能否往返两界） */
+  ascended: boolean
 }
 
 interface GameStore extends PersistedProgress {
@@ -319,6 +335,7 @@ interface GameStore extends PersistedProgress {
   crewCatchNote: CrewCatchNote | null
   tribulation: TribulationHud | null
   skillCds: SkillCdHud[]
+  ascension: AscensionHud | null
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -429,9 +446,16 @@ interface GameStore extends PersistedProgress {
   completeDragonBoatRace: (secondsLeft: number) => void
   showCrewCatch: (text: string) => void
   absorbCore: (name: string, xp: number) => boolean
+  /** 天界渔获直接灌顶修为，返回是否已圆满可渡劫 */
+  gainCultivation: (xp: number, source: string) => boolean
   applyBreakthrough: () => { fromName: string; toName: string; realm: number } | null
   setTribulation: (hud: TribulationHud | null) => void
   setSkillCds: (cds: SkillCdHud[]) => void
+  setMapZone: (zone: MapZone) => void
+  markAscended: () => void
+  grantJade: (amount: number, text?: string) => void
+  spendJade: (amount: number) => boolean
+  setAscension: (hud: AscensionHud | null) => void
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
   resetProgress: () => void
@@ -641,6 +665,11 @@ function readSave(): Partial<PersistedProgress> {
     if (typeof p.cultivationCores === 'number' && Number.isFinite(p.cultivationCores)) {
       out.cultivationCores = Math.max(0, Math.round(p.cultivationCores))
     }
+    if (p.mapZone === 'celestial' || p.mapZone === 'mortal') out.mapZone = p.mapZone
+    if (typeof p.immortalJade === 'number' && Number.isFinite(p.immortalJade)) {
+      out.immortalJade = Math.max(0, Math.round(p.immortalJade))
+    }
+    if (typeof p.ascended === 'boolean') out.ascended = p.ascended
     return out
   } catch {
     return {}
@@ -887,6 +916,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
       realm,
       cultivationXp,
       cultivationCores,
+      mapZone,
+      immortalJade,
+      ascended,
     } = get()
     try {
       localStorage.setItem(
@@ -941,6 +973,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
           realm,
           cultivationXp,
           cultivationCores,
+          mapZone,
+          immortalJade,
+          ascended,
         }),
       )
     } catch {
@@ -1025,6 +1060,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     realm: saved.realm ?? 0,
     cultivationXp: saved.cultivationXp ?? 0,
     cultivationCores: saved.cultivationCores ?? 0,
+    ascended: saved.ascended === true,
+    mapZone: saved.ascended === true ? (saved.mapZone ?? 'mortal') : 'mortal',
+    immortalJade: saved.immortalJade ?? 0,
 
     started: false,
     phase: 'idle',
@@ -1076,6 +1114,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     crewCatchNote: null,
     tribulation: null,
     skillCds: [],
+    ascension: null,
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -1345,15 +1384,25 @@ export const useGameStore = create<GameStore>()((set, get) => {
         state.toast('这件已经在你船上了')
         return false
       }
-      if (state.money < entry.price) {
+      if (entry.celestialOnly && !state.ascended) {
+        state.toast('仙家之物 · 需渡劫飞升后方可请回', 'info')
+        return false
+      }
+      if (entry.jade) {
+        if (state.immortalJade < entry.jade) {
+          state.toast(`仙玉不足 · 还需 ${entry.jade - state.immortalJade} 块`, 'danger')
+          return false
+        }
+      } else if (state.money < entry.price) {
         state.toast('金币不够，先去码头卖几条鱼', 'danger')
         return false
       }
       const ownedItems = [...state.ownedItems, id]
       const patch: Partial<GameStore> = {
-        money: state.money - entry.price,
         ownedItems,
       }
+      if (entry.jade) patch.immortalJade = state.immortalJade - entry.jade
+      else patch.money = state.money - entry.price
       if (entry.kind === 'boat' && isBoatSkin(id)) {
         patch.boatSkin = id
         patch.installedFacilities = resizeInstalled(state.installedFacilities, id)
@@ -2605,6 +2654,53 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
     setSkillCds: (skillCds) => set({ skillCds }),
 
+    setAscension: (ascension) => set({ ascension }),
+
+    gainCultivation: (xp, source) => {
+      const state = get()
+      const gained = Math.max(0, Math.round(xp))
+      if (!gained) return false
+      const cultivationXp = state.cultivationXp + gained
+      set({ cultivationXp })
+      state.toast(`${source} · 修为 +${gained}`, 'gold')
+      persist()
+      const need = realmAt(state.realm).requiredXp
+      return Number.isFinite(need) && cultivationXp >= need
+    },
+
+    setMapZone: (mapZone) => {
+      if (get().mapZone === mapZone) return
+      set({ mapZone })
+      persist()
+    },
+
+    markAscended: () => {
+      if (get().ascended) return
+      set({ ascended: true })
+      persist()
+    },
+
+    grantJade: (amount, text) => {
+      const state = get()
+      const gained = Math.max(0, Math.round(amount))
+      if (!gained) return
+      set({ immortalJade: state.immortalJade + gained })
+      if (text) state.toast(`${text} · 仙玉 +${gained}`, 'gold')
+      persist()
+    },
+
+    spendJade: (amount) => {
+      const state = get()
+      const cost = Math.max(0, Math.round(amount))
+      if (state.immortalJade < cost) {
+        state.toast(`仙玉不足 · 还需 ${cost - state.immortalJade}`, 'danger')
+        return false
+      }
+      set({ immortalJade: state.immortalJade - cost })
+      persist()
+      return true
+    },
+
     toast: (text, tone = 'info') => {
       toastSeq += 1
       const id = toastSeq
@@ -2658,8 +2754,12 @@ export const useGameStore = create<GameStore>()((set, get) => {
         realm: 0,
         cultivationXp: 0,
         cultivationCores: 0,
+        mapZone: 'mortal',
+        immortalJade: 0,
+        ascended: false,
         tribulation: null,
         skillCds: [],
+        ascension: null,
         ownedWeapons: ['knife'],
         equippedWeapon: 'knife',
         weaponAmmo: { knife: 0, speargun: 6 },

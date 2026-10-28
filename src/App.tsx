@@ -33,6 +33,7 @@ import { CrewCatchNotice } from '@/components/CrewCatchNotice'
 import { SeaEventHud } from '@/components/SeaEventHud'
 import { CultivationHud } from '@/components/CultivationHud'
 import { TribulationOverlay } from '@/components/TribulationOverlay'
+import { AscensionOverlay } from '@/components/AscensionOverlay'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 
@@ -40,20 +41,39 @@ export default function App() {
   const isTouch = useIsTouch()
   const started = useGameStore((s) => s.started)
   const underwater = useGameStore((s) => s.underwater)
+  const celestialZone = useGameStore((s) => s.mapZone === 'celestial')
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-abyss text-foreground">
       <GameCanvas />
 
-      <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_46%,rgba(3,15,14,0.42)_100%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-abyss/55 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-abyss/50 to-transparent" />
+      <div
+        className={
+          celestialZone
+            ? 'pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_52%,rgba(96,52,10,0.26)_100%)]'
+            : 'pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_46%,rgba(3,15,14,0.42)_100%)]'
+        }
+      />
+      <div
+        className={
+          celestialZone
+            ? 'pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-[#6a3d12]/45 to-transparent'
+            : 'pointer-events-none absolute inset-x-0 top-0 z-10 h-28 bg-gradient-to-b from-abyss/55 to-transparent'
+        }
+      />
+      <div
+        className={
+          celestialZone
+            ? 'pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-[#6a3d12]/40 to-transparent'
+            : 'pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-abyss/50 to-transparent'
+        }
+      />
 
       {started && (
         <>
           <Hud />
           <CombatHud />
-          {!underwater && <Minimap />}
+          {!underwater && !celestialZone && <Minimap />}
           {!underwater && (
             <>
               <PromptBar />
@@ -69,6 +89,7 @@ export default function App() {
           <CrewCatchNotice />
           <CultivationHud />
           <TribulationOverlay />
+          <AscensionOverlay />
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (

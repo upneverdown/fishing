@@ -111,6 +111,20 @@ function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string })
           <path d="M10 49 l6 -3 3 4 -6 3 Z" fill="#cfe9ea" fillOpacity="0.4" />
         </g>
       )}
+      {variant === 'skyboat' && (
+        <g>
+          <path d="M24 36 Q34 47 56 47 H96 Q112 47 118 36 Z" fill="#efe3cb" />
+          <path d="M26 36 H116 L112 40 H30 Z" fill={accent} />
+          <ellipse cx="70" cy="40" rx="30" ry="6.5" fill="none" stroke={accent} strokeWidth="1.4" strokeOpacity="0.8" />
+          <path d="M70 34 V12" stroke={accent} strokeWidth="2" />
+          <path d="M72 13 Q88 20 72 30 Z" fill="#fff1d2" fillOpacity="0.55" stroke={accent} strokeWidth="1" />
+          <circle cx="46" cy="52" r="5" fill="#fffaf0" fillOpacity="0.7" />
+          <circle cx="66" cy="54" r="6" fill="#fffaf0" fillOpacity="0.55" />
+          <circle cx="88" cy="52" r="5" fill="#fffaf0" fillOpacity="0.65" />
+          <path d="M120 30 l4 -7 4 7 -4 6 Z" fill={accent} fillOpacity="0.85" />
+          <path d="M20 28 l3 -5 3 5 -3 5 Z" fill={accent} fillOpacity="0.7" />
+        </g>
+      )}
     </svg>
   )
 }
@@ -166,6 +180,8 @@ export function ShipyardDialog() {
   const open = useGameStore((s) => s.shopOpen)
   const setShopOpen = useGameStore((s) => s.setShopOpen)
   const money = useGameStore((s) => s.money)
+  const immortalJade = useGameStore((s) => s.immortalJade)
+  const ascended = useGameStore((s) => s.ascended)
   const ownedItems = useGameStore((s) => s.ownedItems)
   const boatSkin = useGameStore((s) => s.boatSkin)
   const rodSkin = useGameStore((s) => s.rodSkin)
@@ -226,6 +242,12 @@ export function ShipyardDialog() {
                 ¥{money.toLocaleString('zh-CN')}
               </span>
             </div>
+            {(ascended || immortalJade > 0) && (
+              <div className="flex items-center gap-1.5 rounded-full bg-gold/8 px-2 py-1 sm:px-2.5">
+                <Sparkles className="size-3.5 text-[#ffe6a8]" />
+                <span className="tnum text-[12px] font-semibold text-[#ffe6a8]">{immortalJade} 仙玉</span>
+              </div>
+            )}
             <button
               type="button"
               onClick={close}
@@ -319,7 +341,8 @@ export function ShipyardDialog() {
               {visibleBoatStyles.map((style) => {
                 const owned = ownedItems.includes(style.id)
                 const equipped = boatSkin === style.id
-                const affordable = money >= style.price
+                const locked = Boolean(style.celestialOnly) && !ascended
+                const affordable = style.jade ? immortalJade >= style.jade : money >= style.price
                 const selected = selectedBoat === style.id
                 return (
                   <div
@@ -367,7 +390,11 @@ export function ShipyardDialog() {
                             owned ? 'text-foam/40' : affordable ? 'text-gold' : 'text-destructive/80',
                           )}
                         >
-                          {owned ? '已拥有' : `¥${style.price}`}
+                          {owned
+                            ? '已拥有'
+                            : style.jade
+                              ? `${style.jade} 仙玉`
+                              : `¥${style.price}`}
                         </span>
                         {equipped ? (
                           <span className="rounded-full border border-gold/30 px-2.5 py-1 text-[10px] text-gold/80">
@@ -384,11 +411,11 @@ export function ShipyardDialog() {
                         ) : (
                           <Button
                             size="sm"
-                            disabled={!affordable}
+                            disabled={!affordable || locked}
                             onClick={() => buyItem(style.id)}
                             className="h-7 rounded-full bg-gold/15 px-2.5 text-[10.5px] text-gold hover:bg-gold/25"
                           >
-                            {affordable ? '购入' : '金币不足'}
+                            {locked ? '飞升后可请' : affordable ? '购入' : style.jade ? '仙玉不足' : '金币不足'}
                           </Button>
                         )}
                       </div>
@@ -405,7 +432,8 @@ export function ShipyardDialog() {
               {ROD_SKINS.map((skin) => {
                 const owned = ownedItems.includes(skin.id)
                 const equipped = rodSkin === skin.id
-                const affordable = money >= skin.price
+                const locked = Boolean(skin.jade) && !ascended
+                const affordable = skin.jade ? immortalJade >= skin.jade : money >= skin.price
                 return (
                   <div
                     key={skin.id}
@@ -427,7 +455,7 @@ export function ShipyardDialog() {
                       <div className="flex items-baseline justify-between">
                         <span className="text-[13.5px] font-semibold text-foam">{skin.name}</span>
                         <span className="tnum text-[10px] text-foam/35">
-                          {skin.glowIntensity > 0 ? '微光' : '原木'}
+                          {skin.jade ? '天界' : skin.glowIntensity > 0 ? '微光' : '原木'}
                         </span>
                       </div>
                       <p className="mt-1 line-clamp-2 min-h-[28px] text-[10.5px] leading-relaxed text-muted-foreground">
@@ -440,7 +468,7 @@ export function ShipyardDialog() {
                             owned ? 'text-foam/40' : affordable ? 'text-gold' : 'text-destructive/80',
                           )}
                         >
-                          {owned ? '已拥有' : `¥${skin.price}`}
+                          {owned ? '已拥有' : skin.jade ? `${skin.jade} 仙玉` : `¥${skin.price}`}
                         </span>
                         {equipped ? (
                           <span className="rounded-full border border-gold/30 px-2.5 py-1 text-[10px] text-gold/80">
@@ -457,11 +485,11 @@ export function ShipyardDialog() {
                         ) : (
                           <Button
                             size="sm"
-                            disabled={!affordable}
+                            disabled={!affordable || locked}
                             onClick={() => buyItem(skin.id)}
                             className="h-7 rounded-full bg-gold/15 px-2.5 text-[10.5px] text-gold hover:bg-gold/25"
                           >
-                            {affordable ? '购入' : '金币不足'}
+                            {locked ? '飞升后可请' : affordable ? '购入' : skin.jade ? '仙玉不足' : '金币不足'}
                           </Button>
                         )}
                       </div>

@@ -33,6 +33,9 @@ import {
 } from '@/game/capture/tools'
 import { variantById, variantStats } from '@/game/capture/variants'
 import { CreatureSystem } from '@/game/creatures/creatureSystem'
+import { CelestialScene, CELESTIAL_SPAWN } from '@/game/celestial/celestialScene'
+import { AscensionGate } from '@/game/celestial/ascensionGate'
+import { boatCanFly } from '@/game/shop/catalog'
 import { CultivationManager, type CultivationPlayer } from '@/game/cultivation/cultivationManager'
 import { SKILLS, realmAttackMul, realmSpeedMul, skillUnlocked } from '@/game/cultivation/realms'
 import { CAMPFIRE_RADIUS, DockLife } from '@/game/world/dockLife'
@@ -56,7 +59,7 @@ import {
   type FishDef,
 } from '@/game/fishing/fishTable'
 import { clamp } from '@/game/utils/math'
-import type { Catch, SeasonId, UnderwaterMode } from '@/types'
+import type { Catch, MapZone, SeasonId, UnderwaterMode } from '@/types'
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer
@@ -80,6 +83,22 @@ export class Game {
   readonly avatar: PlayerAvatar
   readonly wakeSpray: WakeSpray
   readonly dragonRace: DragonBoatRace
+  readonly celestial: CelestialScene
+  readonly gate: AscensionGate
+
+  /** 通天河道上的进度 0~1 */
+  private ascendT = 0
+  /** >0 表示正处于白屏/穿云过渡中 */
+  private crossTimer = 0
+  private crossTotal = 0
+  private crossApplied = false
+  private travelTarget: MapZone | null = null
+  private ascensionHudTimer = 0
+  private celestialDoomTimer = 0
+  private flightHover = 0
+  private pathPoint = new THREE.Vector3()
+  private unsubAscension: (() => void) | null = null
+  private unsubSummon: (() => void) | null = null
 
   private raf = 0
   private disposed = false
@@ -244,6 +263,10 @@ export class Game {
     })
     this.boat.setAnglerVisible(false)
     this.post = new UnderwaterPost()
+    this.celestial = new CelestialScene(this.scene)
+    this.gate = new AscensionGate(this.scene)
+    this.world.setCelestialSurface((x, z, t) => this.celestial.surfaceAt(x, z, t))
+    this.celestial.setRimTarget(this.boat.group)
 
     this.scene.add(this.camera)
     this.buildWeaponRig()
@@ -290,6 +313,11 @@ export class Game {
     this.boat.update(0, 0, this.world, 0, 0, false)
     this.syncCosmetics(useGameStore.getState())
     this.syncSeason(useGameStore.getState(), true)
+    this.unsubAscension = gameEvents.on('ascension:gate', () => this.openAscension())
+    this.unsubSummon = gameEvents.on('celestial:summon', (event) =>
+      this.onCelestialSummon(event.x, event.z),
+    )
+    if (saved.mapZone === 'celestial') this.applyZone('celestial', true)
     this.updateCamera(1, true)
     this.updateWeapon(0, saved, false, false)
   }
@@ -680,7 +708,14 @@ export class Game {
 
     const modal = isModalOpen(store)
     const locked = store.inputLocked
-    if (locked && !this.creatures.introActive && !this.cultivation.tribulating) {
+    const ascending = this.gate.isActive || this.crossTimer > 0
+    if (
+      locked &&
+      !this.creatures.introActive &&
+      !this.cultivation.tribulating &&
+      !ascending &&
+      !this.travelTarget
+    ) {
       store.setInputLocked(false)
     }
 
@@ -702,8 +737,21 @@ export class Game {
       return
     }
 
+    if (this.celestialDoomTimer > 0) {
+      this.celestialDoomTimer -= dt
+      if (this.celestialDoomTimer <= 0) this.world.setDoom(0)
+    }
+
+    if (ascending) {
+      this.updateAscension(dt, time)
+      return
+    }
+
+    this.syncZone(store)
+
     const fishingPhase = this.fishing.phase
     const fishingBusy = fishingPhase !== 'idle' && fishingPhase !== 'charging'
+    const celestial = this.world.isCelestial
     const anchored =
       store.installedFacilities.includes('anchor') && Boolean(store.facilityActive.anchor)
     const allowMove = !modal && !locked && !fishingBusy && !anchored
@@ -777,20 +825,25 @@ export class Game {
       gameEvents.emit('boat:collide', { power: impact })
     }
 
-    this.seaEvents.update(dt, time, {
-      canSpawn:
-        allowMove &&
-        !modal &&
-        !locked &&
-        !store.boss &&
-        !store.dead &&
-        this.fishing.phase === 'idle',
-      sailing: allowMove && Math.abs(this.boat.speed) > 0.9,
-      paused: modal || locked,
-    })
-    this.treasures.updateSurface(dt, time, allowMove && !modal && !locked && !store.dead)
+    if (celestial) {
+      this.celestial.setRimTarget(this.boat.group)
+      if (this.seaEvents.activeKind) this.seaEvents.cancel()
+    } else {
+      this.seaEvents.update(dt, time, {
+        canSpawn:
+          allowMove &&
+          !modal &&
+          !locked &&
+          !store.boss &&
+          !store.dead &&
+          this.fishing.phase === 'idle',
+        sailing: allowMove && Math.abs(this.boat.speed) > 0.9,
+        paused: modal || locked,
+      })
+      this.treasures.updateSurface(dt, time, allowMove && !modal && !locked && !store.dead)
+    }
 
-    if (allowMove) {
+    if (allowMove && !celestial) {
       const locked = canEnterWater(store.boatSkin, this.boat.position.x, this.boat.position.z)
       if (locked) {
         this.boat.position.x = prevX
@@ -809,23 +862,27 @@ export class Game {
     }
     this.waterWarnT = Math.max(0, this.waterWarnT - dt)
 
-    this.world.water.setContact(
-      0,
-      this.boat.position.x,
-      this.boat.position.z,
-      1.7,
-      0.26 + Math.min(0.22, this.boat.speed * 0.035),
-    )
+    if (!celestial) {
+      this.world.water.setContact(
+        0,
+        this.boat.position.x,
+        this.boat.position.z,
+        1.7,
+        0.26 + Math.min(0.22, this.boat.speed * 0.035),
+      )
+    }
     this.fishing.update(dt, time)
-    this.otter.update(
-      dt,
-      time,
-      false,
-      this.boat.position,
-      this.boat.position,
-      store.pet.affection,
-      this.boat.heading,
-    )
+    if (!celestial) {
+      this.otter.update(
+        dt,
+        time,
+        false,
+        this.boat.position,
+        this.boat.position,
+        store.pet.affection,
+        this.boat.heading,
+      )
+    }
     if (!modal && !this.cultivation.tribulating) {
       this.creatures.update(dt, time, {
         position: this.boat.position,
@@ -841,10 +898,16 @@ export class Game {
     this.world.update(time, dt, this.boat.position)
     this.world.updateFoam(dt)
     this.underwaterWorld.updateAmbient(time, dt, this.boat.position)
-    this.dockLife.update(time, dt, this.boat.position)
-    this.leaves.update(time, dt, this.boat.position)
-    this.seasonFx.update(time, dt, this.boat.position)
-    this.seasonFx.setVisible(true)
+    this.celestial.update(dt, time, this.boat.position)
+    this.syncFlight(store)
+    if (celestial) {
+      this.seasonFx.setVisible(false)
+    } else {
+      this.dockLife.update(time, dt, this.boat.position)
+      this.leaves.update(time, dt, this.boat.position)
+      this.seasonFx.update(time, dt, this.boat.position)
+      this.seasonFx.setVisible(true)
+    }
 
     this.wakeTimer -= dt
     if (!modal && !locked && allowMove && this.boat.speed > 1.5 && this.wakeTimer <= 0) {
@@ -891,7 +954,7 @@ export class Game {
     }
     this.wakeSpray.update(dt)
 
-    this.dragonRace.update(dt, time, this.boat.position.x, this.boat.position.z)
+    if (!celestial) this.dragonRace.update(dt, time, this.boat.position.x, this.boat.position.z)
     this.raceSyncTimer -= dt
     if (this.raceSyncTimer <= 0) {
       this.raceSyncTimer = 0.12
@@ -929,6 +992,201 @@ export class Game {
       this.handleActions(store, modal)
       this.handleCombat(store, modal)
     }
+  }
+
+  // ------------------------------------------------------------- 飞升与天界
+
+  /** 渡劫成功后：船头升起通天河道，强制逆流升空 */
+  private openAscension() {
+    if (this.gate.isActive) return
+    const store = useGameStore.getState()
+    this.fishing.reset()
+    this.boat.getForward(this.forward)
+    this.gate.start(this.boat.position, this.forward)
+    this.ascendT = 0
+    this.crossTimer = 0
+    this.travelTarget = null
+    this.avatar.group.visible = false
+    this.seaEvents.cancel()
+    this.treasures.clearPrompt()
+    store.setUnderwater(false)
+    store.setBoss(null)
+    store.setInputLocked(true)
+    store.setAscension({ phase: 'sailing', progress: 0, altitude: 0 })
+    store.toast('天界之门已开 · 逆流而上', 'gold')
+  }
+
+  private updateAscension(dt: number, time: number) {
+    const store = useGameStore.getState()
+    input.clearQueued()
+
+    if (this.crossTimer > 0) {
+      this.crossTimer -= dt
+      const total = this.crossTotal || 1
+      const elapsedRatio = 1 - Math.max(0, this.crossTimer) / total
+      this.pushAscensionHud(dt, 'crossing', elapsedRatio)
+      this.gate.update(dt, time)
+      this.boat.update(dt, time, this.world, 0, 0, false)
+      this.crewSystem.update(dt, time)
+      this.world.update(time, dt, this.boat.position)
+      this.world.updateFoam(dt)
+      this.celestial.update(dt, time, this.boat.position)
+      this.updateCamera(dt, false)
+      if (!this.crossApplied && this.crossTimer <= total * 0.5) {
+        this.crossApplied = true
+        const target = this.travelTarget ?? 'celestial'
+        this.travelTarget = null
+        this.applyZone(target)
+      }
+      if (this.crossTimer <= 0) {
+        this.crossApplied = false
+        this.crossTotal = 0
+        store.setAscension(null)
+        store.setInputLocked(false)
+        this.avatar.group.visible = !store.underwater
+      }
+      return
+    }
+
+    this.ascendT = Math.min(1, this.ascendT + dt / 9.5)
+    this.gate.setProgress(this.ascendT)
+    const point = this.gate.pointAt(this.ascendT, this.pathPoint)
+    this.boat.position.x = point.x
+    this.boat.position.z = point.z
+    this.boat.heading = this.gate.heading
+    this.boat.speed = 0
+    this.world.setHover(point.y - this.world.rawWaveHeight(point.x, point.z, time), true)
+    this.boat.update(dt, time, this.world, 0, 0, false)
+    this.crewSystem.update(dt, time)
+    this.gate.update(dt, time)
+    this.world.update(time, dt, this.boat.position)
+    this.world.updateFoam(dt)
+    this.celestial.update(dt, time, this.boat.position)
+    this.updateCamera(dt, false)
+    this.pushAscensionHud(dt, 'sailing', this.ascendT)
+    if (this.ascendT >= 1) {
+      this.crossTimer = 2.1
+      this.crossTotal = 2.1
+      this.crossApplied = false
+      store.toast('云海在脚下合拢 · 天界到了', 'gold')
+    }
+  }
+
+  private pushAscensionHud(dt: number, phase: 'sailing' | 'crossing', progress: number) {
+    this.ascensionHudTimer -= dt
+    if (this.ascensionHudTimer > 0) return
+    this.ascensionHudTimer = 0.06
+    useGameStore.getState().setAscension({
+      phase,
+      progress,
+      altitude: this.world.hoverAltitude,
+    })
+  }
+
+  /** 快捷键 / 传送阵：在凡间海湾与天界云海之间往返 */
+  private beginTravel(to: MapZone) {
+    const store = useGameStore.getState()
+    if (this.gate.isActive || this.crossTimer > 0) return
+    if (to === 'celestial' && !store.ascended) {
+      store.toast('凡躯未渡劫 · 天门不开', 'info')
+      return
+    }
+    if (store.mapZone === to) {
+      store.toast('已经在这张图上了', 'info')
+      return
+    }
+    if (this.fishing.phase !== 'idle') {
+      store.toast('先收线，再踏传送阵', 'info')
+      return
+    }
+    this.travelTarget = to
+    this.crossTimer = 1.5
+    this.crossTotal = 1.5
+    this.crossApplied = false
+    store.setInputLocked(true)
+    store.setAscension({ phase: 'crossing', progress: 1, altitude: this.world.hoverAltitude })
+    store.toast(to === 'celestial' ? '传送阵亮起 · 前往天界' : '传送阵亮起 · 返回凡间', 'gold')
+  }
+
+  private applyZone(to: MapZone, immediate = false) {
+    const store = useGameStore.getState()
+    const celestial = to === 'celestial'
+    if (!immediate && store.mapZone === to && this.world.isCelestial === celestial) return
+    this.gate.stop()
+    this.fishing.reset()
+    this.seaEvents.cancel()
+    this.treasures.clearPrompt()
+    this.seaEvents.setVisible(!celestial)
+    this.treasures.setVisible(!celestial)
+    store.setMapZone(to)
+    this.world.setCelestial(celestial, true)
+    this.creatures.setZone(to)
+    if (celestial) this.celestial.enter()
+    else this.celestial.exit()
+    const pose = celestial
+      ? { x: CELESTIAL_SPAWN.x, z: CELESTIAL_SPAWN.z, heading: 0 }
+      : { x: SPAWN.x, z: SPAWN.z, heading: SPAWN.heading }
+    this.boat.position.set(pose.x, 0, pose.z)
+    this.boat.heading = pose.heading
+    this.boat.speed = 0
+    this.boat.group.rotation.set(0, pose.heading, 0)
+    this.world.setHover(0, true)
+    this.boat.update(0, this.elapsed, this.world, 0, 0, false)
+    this.swimPos.set(pose.x, -1.8, pose.z)
+    this.swimVel.set(0, 0, 0)
+    this.otter.group.visible = !celestial
+    this.dockLife.group.visible = !celestial
+    this.dragonRace.group.visible = !celestial
+    this.leaves.setVisible(!celestial)
+    this.seasonFx.setVisible(!celestial)
+    this.avatar.group.visible = true
+    this.captureFish = null
+    this.lastLockedWater = null
+    this.autoLockedBossId = ''
+    this.ascendT = 0
+    this.flightHover = 0
+    store.setBoss(null)
+    store.setRadarContacts([])
+    store.setUnderwater(false)
+    store.setZone(celestial ? '天界云海' : '老码头')
+    store.setBoatPose({ x: pose.x, z: pose.z, heading: pose.heading })
+    store.setCombatCamera(false)
+    this.updateCamera(1, true)
+    this.camPos.copy(this.camera.position)
+    this.camera.getWorldDirection(this.viewDir)
+    this.camLook.copy(this.camera.position).addScaledVector(this.viewDir, 6)
+    gameEvents.emit('zone:changed', { zone: to })
+    if (!immediate) {
+      store.toast(
+        celestial ? '天界云海 · 仙气裹住船身' : '回到凡间海湾 · 潮声依旧',
+        'gold',
+      )
+    }
+  }
+
+  private syncZone(store: ReturnType<typeof useGameStore.getState>) {
+    if (store.mapZone !== (this.world.isCelestial ? 'celestial' : 'mortal')) {
+      this.applyZone(store.mapZone)
+    }
+  }
+
+  /** 仙舟不沾水：航速越快，离云面越高 */
+  private syncFlight(store: ReturnType<typeof useGameStore.getState>) {
+    const flying = store.mapZone === 'celestial' && boatCanFly(store.boatSkin)
+    const target = flying ? 2.4 + Math.min(4.2, Math.abs(this.boat.speed) * 0.62) : 0
+    this.flightHover += (target - this.flightHover) * 0.08
+    this.world.setHover(this.flightHover)
+  }
+
+  private onCelestialSummon(x: number, z: number) {
+    const store = useGameStore.getState()
+    this.boat.getForward(this.forward)
+    this.pathPoint.set(x, this.world.waveHeight(x, z, this.elapsed), z)
+    this.celestial.burst(this.pathPoint, 26)
+    this.world.setDoom(0.6)
+    this.celestialDoomTimer = 4.5
+    store.damagePlayer(14, '天雷金鳗引来的雷暴')
+    store.toast('雷云压顶 · 天雷在云海里翻涌', 'danger')
   }
 
   private syncCultivation(
@@ -1337,6 +1595,47 @@ export class Game {
   private resolveInteract(store: ReturnType<typeof useGameStore.getState>) {
     if (store.underwater || this.fishing.phase !== 'idle') return null
     const boat = this.boat.position
+    if (this.world.isCelestial) {
+      const merchant = this.celestial.merchantPosition
+      const merchantDistance = Math.hypot(boat.x - merchant.x, boat.z - merchant.z)
+      if (merchantDistance < 13) {
+        return {
+          kind: 'merchant' as const,
+          id: null,
+          prompt: '仙舟商舶 · 以天界渔换取仙舟云梭',
+          label: '交易',
+        }
+      }
+      const gate = this.celestial.gatePosition
+      const gateDistance = Math.hypot(boat.x - gate.x, boat.z - gate.z)
+      if (gateDistance < 15) {
+        return {
+          kind: 'portal' as const,
+          id: null,
+          prompt: '接引仙阵 · 传送回凡间海湾',
+          label: '传送',
+        }
+      }
+      const core = this.cultivation.nearestCore(boat)
+      if (core) {
+        return {
+          kind: 'core' as const,
+          id: null,
+          prompt: `吸收${core.name} · 修为 +${core.xp}`,
+          label: '吸收',
+        }
+      }
+      const harvest = this.creatures.nearestHarvest(boat)
+      if (harvest && harvest.distance < 20) {
+        return {
+          kind: 'harvest' as const,
+          id: harvest.id,
+          prompt: `收获 ${harvest.name} · 战利品 ¥${harvest.value}`,
+          label: '收获',
+        }
+      }
+      return null
+    }
     const seaEvent = this.seaEvents.interactInfo()
     if (seaEvent) {
       return { kind: 'seaevent' as const, id: null, prompt: seaEvent.prompt, label: seaEvent.label }
@@ -1399,7 +1698,9 @@ export class Game {
     this.statusTimer = 0.25
 
     const store = useGameStore.getState()
-    const zone = zoneAt(this.boat.position.x, this.boat.position.z)
+    const zone = this.world.isCelestial
+      ? '天界云海'
+      : zoneAt(this.boat.position.x, this.boat.position.z)
     if (zone !== this.lastZone) {
       this.lastZone = zone
       store.setZone(zone)
@@ -1423,6 +1724,14 @@ export class Game {
   private resetToDock() {
     input.clear()
     this.cultivation.abort()
+    this.gate.stop()
+    this.crossTimer = 0
+    this.crossTotal = 0
+    this.crossApplied = false
+    this.ascendT = 0
+    this.travelTarget = null
+    this.avatar.group.visible = true
+    useGameStore.getState().setAscension(null)
     this.boat.position.set(SPAWN.x, 0, SPAWN.z)
     this.boat.heading = SPAWN.heading
     this.boat.speed = 0
@@ -1946,6 +2255,8 @@ export class Game {
     if (input.consumeDive()) {
       if (store.boss) {
         store.toggleCombatCamera()
+      } else if (this.world.isCelestial) {
+        store.toast('天界只有云海 · 不必下潜', 'info')
       } else if (this.fishing.phase === 'idle') {
         store.setUnderwater(true)
       } else {
@@ -1977,6 +2288,10 @@ export class Game {
       store.setCrewOpen(true)
     }
 
+    if (input.consumeZone()) {
+      this.beginTravel(this.world.isCelestial ? 'mortal' : 'celestial')
+    }
+
     if (input.consumeTool()) {
       if (
         !this.cultivation.absorbNearestCore(this.boat.position) &&
@@ -1990,6 +2305,18 @@ export class Game {
       const info = this.resolveInteract(store)
       if (!info) {
         if (skillUnlocked(SKILLS[1], store.realm)) this.cultivation.castFire(this.cultPlayer)
+        return
+      }
+      if (info.kind === 'merchant') {
+        if (this.fishing.phase !== 'idle') {
+          store.toast('先收线，再与船灵交易', 'info')
+          return
+        }
+        store.setShopOpen(true)
+        return
+      }
+      if (info.kind === 'portal') {
+        this.beginTravel(this.world.isCelestial ? 'mortal' : 'celestial')
         return
       }
       if (info.kind === 'seaevent') {
@@ -2423,6 +2750,10 @@ export class Game {
     this.avatar.dispose()
     this.wakeSpray.dispose()
     this.dragonRace.dispose()
+    this.unsubAscension?.()
+    this.unsubSummon?.()
+    this.celestial.dispose()
+    this.gate.dispose()
     this.achievements.dispose()
     this.post.dispose()
     this.seasonFx.dispose()

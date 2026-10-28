@@ -751,6 +751,11 @@ export class SeaEvents {
     this.spawnTimer = 26 + Math.random() * 16
   }
 
+  /** 天界云海里不显示凡间的沉船与漂流物 */
+  setVisible(visible: boolean) {
+    this.root.visible = visible
+  }
+
   private finish(_success: boolean, message: string) {
     const kind = this.kind
     if (!kind) return

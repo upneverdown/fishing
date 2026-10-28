@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { World } from '@/game/world/world'
-import type { RadarContact, WaterId } from '@/types'
+import type { MapZone, RadarContact, WaterId } from '@/types'
 import { waterAt } from '@/game/world/waters'
 import { creatureRealm } from '@/game/cultivation/realms'
 import { useGameStore } from '@/store/useGameStore'
@@ -62,6 +62,17 @@ const DRAGON_MAT = '#2f8f83'
 const TURTLE_MAT = '#556b48'
 const GOLD_MAT = '#d8b45a'
 
+/** 天界云海中的同一批生物：换名、换色、加血，成为仙兽 */
+const CELESTIAL_FORMS: Record<
+  CreatureKind,
+  { name: string; body: string; accent: string; hpMul: number }
+> = {
+  shark: { name: '云海蛟鲨', body: '#6f8fc8', accent: '#ffe6a8', hpMul: 1.7 },
+  whale: { name: '凌霄灵鲸', body: '#5b74cc', accent: '#fff0c8', hpMul: 1.6 },
+  dragon: { name: '九天雷龙', body: '#d99a1f', accent: '#fff3cf', hpMul: 2.2 },
+  turtle: { name: '玄天真龟', body: '#3f8f86', accent: '#ffe6b0', hpMul: 2 },
+}
+
 function finGeometry() {
   const shape = new THREE.Shape()
   shape.moveTo(0, 0)
@@ -120,6 +131,8 @@ export class CreatureSystem {
   private vortexPos = new THREE.Vector3()
   private vortexTick = 0
   private lastBossId: string | null = null
+  private zone: MapZone = 'mortal'
+  private originals = new Map<string, { name: string; hp: number; body: string; accent: string }>()
   private bossTimer = 0
   private clock = 0
   private raycaster = new THREE.Raycaster()
@@ -169,6 +182,40 @@ export class CreatureSystem {
     const boss = this.creatures.find((c) => c.id === id && c.alive && !c.corpse)
     if (!boss) return null
     return out.copy(boss.group.position)
+  }
+
+  /** 天界云海：生物换成仙兽形态 */
+  setZone(zone: MapZone) {
+    if (zone === this.zone) return
+    this.zone = zone
+    const celestial = zone === 'celestial'
+    for (const c of this.creatures) {
+      let base = this.originals.get(c.id)
+      if (!base) {
+        base = {
+          name: c.name,
+          hp: c.maxHp,
+          body: `#${c.material.color.getHexString()}`,
+          accent: `#${c.accent.color.getHexString()}`,
+        }
+        this.originals.set(c.id, base)
+      }
+      if (celestial) {
+        const form = CELESTIAL_FORMS[c.kind]
+        c.name = form.name
+        c.maxHp = Math.round(base.hp * form.hpMul)
+        if (c.alive && !c.corpse) c.hp = c.maxHp
+        c.material.color.set(form.body)
+        c.accent.color.set(form.accent)
+      } else {
+        c.name = base.name
+        c.maxHp = base.hp
+        if (c.alive && !c.corpse) c.hp = c.maxHp
+        c.material.color.set(base.body)
+        c.accent.color.set(base.accent)
+        c.material.emissiveIntensity = 0
+      }
+    }
   }
 
   private buildArenaRing() {
@@ -816,10 +863,17 @@ export class CreatureSystem {
   }
 
   private clampToWorld(c: Creature) {
-    const floor = this.world.depthAt(c.group.position.x, c.group.position.z)
-    const minY = c.kind === 'whale' ? -6.5 : -Math.max(1, floor - 0.9)
-    const maxY = c.kind === 'whale' ? 1.5 : -0.9
-    c.group.position.y = clamp(c.group.position.y, minY, maxY)
+    if (this.zone === 'celestial') {
+      // 云海不透底，天界的猎手必须露出云面才看得见
+      const crest = this.world.waveHeight(c.group.position.x, c.group.position.z, this.clock)
+      const breach = c.kind === 'dragon' ? 3.6 : c.kind === 'whale' ? 1.3 : 0.6
+      c.group.position.y = clamp(c.group.position.y, crest + breach - 0.5, crest + breach + 0.9)
+    } else {
+      const floor = this.world.depthAt(c.group.position.x, c.group.position.z)
+      const minY = c.kind === 'whale' ? -6.5 : -Math.max(1, floor - 0.9)
+      const maxY = c.kind === 'whale' ? 1.5 : -0.9
+      c.group.position.y = clamp(c.group.position.y, minY, maxY)
+    }
     const distHome = Math.hypot(
       c.group.position.x - c.home.x,
       c.group.position.z - c.home.y,
@@ -1112,7 +1166,7 @@ export class CreatureSystem {
         c.material.emissive.set('#ff6d5a')
         c.material.emissiveIntensity = c.hitFlash * 2.4
       } else if (c.kind === 'dragon') {
-        c.material.emissive.set('#0d3b39')
+        c.material.emissive.set(this.zone === 'celestial' ? '#7a5410' : '#0d3b39')
         c.material.emissiveIntensity = 0.4
       } else {
         c.material.emissive.set('#000000')

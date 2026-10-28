@@ -20,6 +20,8 @@ export interface ColliderSink {
 export class CollisionWorld implements ColliderSink {
   readonly circles: CircleCollider[] = []
   readonly boxes: BoxCollider[] = []
+  /** 天界海域没有凡间礁石与码头 */
+  enabled = true
 
   addCircle(x: number, z: number, r: number) {
     if (r <= 0) return
@@ -31,6 +33,7 @@ export class CollisionWorld implements ColliderSink {
   }
 
   circleBlocked(x: number, z: number, radius: number) {
+    if (!this.enabled) return false
     for (const circle of this.circles) {
       const reach = circle.r + radius
       const dx = x - circle.x
