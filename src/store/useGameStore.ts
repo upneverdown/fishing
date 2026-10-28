@@ -455,6 +455,8 @@ interface GameStore extends PersistedProgress {
   refreshDailyQuests: () => void
   damagePlayer: (amount: number, source?: string) => boolean
   healPlayer: (amount: number) => void
+  /** 擂台判负时把玩家打到悬一线，不走普通死亡掉落渔获 */
+  setHp: (value: number) => void
   respawn: () => void
   buyWeapon: (id: WeaponId) => boolean
   equipWeapon: (id: WeaponId) => void
@@ -2253,6 +2255,14 @@ export const useGameStore = create<GameStore>()((set, get) => {
       persist()
     },
 
+    setHp: (value) => {
+      const state = get()
+      const hp = clamp(Math.round(value), 0, maxHpFor(state.realm))
+      if (hp === state.hp) return
+      set({ hp })
+      persist()
+    },
+
     respawn: () => {
       const state = get()
       if (!state.dead) return
@@ -3105,6 +3115,7 @@ export function isModalOpen(state: GameStore = useGameStore.getState()) {
       state.skinShopOpen ||
       state.factionChoiceOpen ||
       state.sectAt !== null ||
+      (state.contest !== null && state.contest.phase !== 'fighting') ||
       state.dead,
   )
 }

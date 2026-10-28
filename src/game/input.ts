@@ -30,6 +30,8 @@ class InputController {
   private skillSwordPress = false
   private achievementsPress = false
   private crewPress = false
+  private thunderPress = false
+  private flightPress = false
   private zonePress = false
   private slotPress = 0
   private joy = { x: 0, y: 0, active: false }
@@ -132,6 +134,8 @@ class InputController {
     if (key === 'r') this.skillSwordPress = true
     if (key === 'n') this.achievementsPress = true
     if (key === 'm') this.crewPress = true
+    if (key === 'u') this.thunderPress = true
+    if (key === 'o') this.flightPress = true
     if (key === 'p') this.zonePress = true
     if (key === '1') this.slotPress = 1
     if (key === '2') this.slotPress = 2
@@ -312,6 +316,18 @@ class InputController {
     return pressed
   }
 
+  consumeThunder() {
+    const pressed = this.thunderPress
+    this.thunderPress = false
+    return pressed
+  }
+
+  consumeFlight() {
+    const pressed = this.flightPress
+    this.flightPress = false
+    return pressed
+  }
+
   consumeZone() {
     const pressed = this.zonePress
     this.zonePress = false
@@ -425,6 +441,8 @@ class InputController {
     this.skillSwordPress = false
     this.achievementsPress = false
     this.crewPress = false
+    this.thunderPress = false
+    this.flightPress = false
     this.zonePress = false
     this.slotPress = 0
     this.spaceHeld = false
@@ -461,6 +479,8 @@ class InputController {
     this.skillSwordPress = false
     this.achievementsPress = false
     this.crewPress = false
+    this.thunderPress = false
+    this.flightPress = false
     this.zonePress = false
     this.slotPress = 0
     this.clickPoint = null

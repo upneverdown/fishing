@@ -40,6 +40,11 @@ import { AscensionGate } from '@/game/celestial/ascensionGate'
 import { boatCanFly } from '@/game/shop/catalog'
 import { CultivationManager, type CultivationPlayer } from '@/game/cultivation/cultivationManager'
 import { SKILLS, realmAttackMul, realmSpeedMul, skillUnlocked } from '@/game/cultivation/realms'
+import { SectHalls, SECT_ELDERS } from '@/game/sect/sectHalls'
+import { ThunderLure } from '@/game/sect/thunderlure'
+import { ContestArena, CONTEST_POINT } from '@/game/sect/contestArena'
+import { equippedLevel, fishingBlessing, hasTechnique, FISH_XP_BY_RARITY } from '@/game/sect/blessings'
+import { techniqueById, techniqueValue } from '@/game/sect/techniques'
 import { CAMPFIRE_RADIUS, DockLife } from '@/game/world/dockLife'
 import { weaponById } from '@/game/combat/weapons'
 import { dayKey } from '@/game/economy/market'
@@ -88,6 +93,21 @@ export class Game {
   readonly dragonRace: DragonBoatRace
   readonly celestial: CelestialScene
   readonly gate: AscensionGate
+  readonly sectHalls: SectHalls
+  readonly thunder: ThunderLure
+  readonly contest: ContestArena
+
+  /** 《天雷引》冷却 */
+  private thunderCd = 0
+  /** 《御剑飞行》是否已踏剑离水 */
+  private swordFlight = false
+  private thunderTarget = new THREE.Vector3()
+  /** 大比：进场大字停留时间 */
+  private contestEnterT = 0
+  private contestClock = 0
+  private contestHudTimer = 0
+  private unsubRegister: (() => void) | null = null
+  private unsubLeaveContest: (() => void) | null = null
 
   /** 通天河道上的进度 0~1 */
   private ascendT = 0
@@ -271,6 +291,9 @@ export class Game {
     this.post = new UnderwaterPost()
     this.celestial = new CelestialScene(this.scene)
     this.gate = new AscensionGate(this.scene)
+    this.sectHalls = new SectHalls(this.scene)
+    this.thunder = new ThunderLure(this.scene)
+    this.contest = new ContestArena(this.scene)
     this.world.setCelestialSurface((x, z, t) => this.celestial.surfaceAt(x, z, t))
     this.celestial.setRimTarget(this.boat.group)
 
@@ -323,6 +346,8 @@ export class Game {
     this.unsubSummon = gameEvents.on('celestial:summon', (event) =>
       this.onCelestialSummon(event.x, event.z),
     )
+    this.unsubRegister = gameEvents.on('contest:register', () => this.startContest())
+    this.unsubLeaveContest = gameEvents.on('contest:leave', () => this.leaveContest())
     if (saved.mapZone === 'celestial') this.applyZone('celestial', true)
     this.updateCamera(1, true)
     this.updateWeapon(0, saved, false, false)
@@ -807,9 +832,13 @@ export class Game {
     }
     this.crewSystem.update(dt, time)
 
+    // 擂台上的心魔就是唯一目标：像打首领那样自动锁向，否则绕圈的身影根本砍不着
+    const duelTarget =
+      !store.underwater && store.contest?.phase === 'fighting' ? this.contest.opponentPosition : null
+    if (duelTarget) this.combatFaceTarget.copy(duelTarget)
     const bossTarget = store.boss && !store.underwater
       ? this.creatures.bossPosition(store.boss.id, this.combatFaceTarget)
-      : null
+      : duelTarget
     this.combatHasTarget = Boolean(bossTarget)
     this.avatar.group.visible = !store.underwater
     this.avatar.update(dt, this.boat, allowMove && Math.abs(this.boat.speed) > 0.6, bossTarget)
@@ -922,6 +951,16 @@ export class Game {
       this.seasonFx.setVisible(true)
     }
     this.factionAura.update(time, dt, this.auraCenter.set(this.boat.position.x, this.boat.position.y + 0.9, this.boat.position.z))
+    this.thunder.update(dt)
+    this.thunderCd = Math.max(0, this.thunderCd - dt)
+    this.sectHalls.update(time, dt)
+    this.contest.ambient(time)
+    this.updateContest(dt, time, store)
+    if (this.swordFlight) {
+      const alt = this.swordFlightAlt()
+      if (alt <= 0) this.setSwordFlight(false)
+      else this.boat.flyHeight = alt
+    }
 
     this.wakeTimer -= dt
     if (!modal && !locked && allowMove && this.boat.speed > 1.5 && this.wakeTimer <= 0) {
@@ -1156,6 +1195,13 @@ export class Game {
     this.otter.group.visible = !celestial
     this.dockLife.group.visible = !celestial
     this.dragonRace.group.visible = !celestial
+    this.sectHalls.setVisible(celestial)
+    if (!celestial) this.setSwordFlight(false)
+    if (!celestial && this.contest.active) {
+      this.contest.end()
+      store.setContest(null)
+    }
+    this.contest.setZoneVisible(celestial)
     this.leaves.setVisible(!celestial)
     this.seasonFx.setVisible(!celestial)
     this.avatar.group.visible = true
@@ -1197,11 +1243,299 @@ export class Game {
     this.world.setHover(this.flightHover)
   }
 
+  /** 《御剑飞行》：踏剑离水，凡间海域也能凌空虚渡 */
+  private setSwordFlight(on: boolean) {
+    this.swordFlight = on
+    this.boat.flyHeight = on ? this.swordFlightAlt() : 0
+  }
+
+  private swordFlightAlt() {
+    const store = useGameStore.getState()
+    const level = equippedLevel(store, 'swordflight')
+    const def = techniqueById('swordflight')
+    return level > 0 && def ? techniqueValue(def, level) : 0
+  }
+
+  private toggleSwordFlight(store: ReturnType<typeof useGameStore.getState>) {
+    if (!hasTechnique(store, 'swordflight')) {
+      store.toast('尚未修习《御剑飞行》· 去宗门山门求法', 'info')
+      return
+    }
+    const next = !this.swordFlight
+    this.setSwordFlight(next)
+    store.toast(
+      next ? `御剑腾空 · 凌虚 ${this.swordFlightAlt().toFixed(1)} 丈` : '收剑落水 · 船身重新压住浪头',
+      next ? 'gold' : 'info',
+    )
+    audio.snap()
+  }
+
+  /** 《天雷引》：朝准星指向的水面降雷，雷域内的鱼尽数麻倒进篓 */
+  private castThunderLure(store: ReturnType<typeof useGameStore.getState>) {
+    if (store.underwater) {
+      store.toast('雷法要引天上的雷 · 先浮回水面', 'info')
+      return
+    }
+    const level = equippedLevel(store, 'thunderlure')
+    const def = techniqueById('thunderlure')
+    if (!def || level <= 0) {
+      store.toast('尚未修习《天雷引》· 去仙宗雷堂求法', 'info')
+      return
+    }
+    if (this.fishing.phase !== 'idle') {
+      store.toast('先收线，再引天雷', 'info')
+      return
+    }
+    if (this.thunderCd > 0) {
+      store.toast(`雷池尚未蓄满 · 还需 ${this.thunderCd.toFixed(1)} 秒`, 'info')
+      return
+    }
+
+    const radius = techniqueValue(def, level)
+    this.camera.getWorldDirection(this.viewDir)
+    this.viewDir.y = 0
+    if (this.viewDir.lengthSq() < 0.0001) this.boat.getForward(this.viewDir)
+    this.viewDir.normalize()
+    const reach = clamp(14 + Math.abs(this.boat.speed) * 2.2, 14, 36)
+    const center = this.thunderTarget
+      .copy(this.boat.position)
+      .addScaledVector(this.viewDir, reach)
+
+    this.thunder.strike(center, radius, 3)
+    this.world.foam.splash(center.x, center.z, radius * 1.3, 2.2)
+    this.world.foam.ripple(center.x, center.z, radius * 0.9)
+    this.world.flashLightning(1.1)
+    audio.thunder()
+    this.thunderCd = 9
+
+    const boltDamage = Math.round(
+      24 * realmAttackMul(store.realm) * factionOf(store.playerFaction).attackMul,
+    )
+    const stunned = this.creatures.aoeHit(center, radius, boltDamage, 2.4, '天雷引')
+    const scorched = this.contest.strike(center, radius, boltDamage)
+
+    let bagged = 0
+    const capacity = bagCapacity(store)
+    for (const fish of this.underwaterWorld.catchableFish()) {
+      if (store.bag.length >= capacity) break
+      const p = fish.group.position
+      if (Math.hypot(p.x - center.x, p.z - center.z) > radius) continue
+      if (!this.thunderBagFish(fish)) continue
+      bagged += 1
+    }
+
+    gameEvents.emit('thunderlure:strike', {
+      x: center.x,
+      z: center.z,
+      radius,
+      catches: bagged,
+    })
+    const total = bagged + stunned
+    if (scorched) this.contestFeedback()
+    store.toast(
+      scorched
+        ? `天雷落处 · 心魔被劈掉 ${boltDamage} 点道行`
+        : total > 0
+          ? `天雷落处 · 麻倒 ${total} 条，${bagged} 条直接进篓`
+          : `天雷劈开水面 · 雷域 ${radius.toFixed(0)} 丈内空空如也`,
+      scorched || total > 0 ? 'gold' : 'info',
+    )
+  }
+
+  /** 雷域里的鱼没有挣扎的机会 */
+  private thunderBagFish(fish: { group: THREE.Group; def: FishDef }) {
+    const store = useGameStore.getState()
+    const caught = createCatch(fish.def, 'net')
+    if (!store.addCatch(caught, 'net')) return false
+    this.underwaterWorld.removeFish(fish.group)
+    store.setCaptureResult([caught])
+    this.world.foam.splash(fish.group.position.x, fish.group.position.z, 4, 0.9)
+    audio.caught()
+
+    const blessing = fishingBlessing(store)
+    if (blessing.absorbMul > 0) {
+      const xp = Math.round(FISH_XP_BY_RARITY[caught.rarity] * blessing.absorbMul)
+      if (store.gainCultivation(xp, '吸星大法')) store.toast('修为圆满 · 可渡下一次天劫', 'gold')
+    }
+    return true
+  }
+
+  /** 报名即被光幕卷上擂台：一局定胜负 */
+  private startContest() {
+    const store = useGameStore.getState()
+    if (this.contest.active) return
+    if (!store.playerFaction) {
+      store.toast('尚未转职 · 无从代表宗门出战', 'info')
+      return
+    }
+    if (this.gate.isActive || this.crossTimer > 0) return
+    this.fishing.reset()
+    this.seaEvents.cancel()
+    this.setSwordFlight(false)
+    store.setBoss(null)
+    store.setUnderwater(false)
+    this.boat.position.set(CONTEST_POINT.x, 0, CONTEST_POINT.z - 9)
+    this.boat.heading = Math.PI
+    this.boat.speed = 0
+    this.boat.group.rotation.set(0, Math.PI, 0)
+    this.contest.begin({ realm: store.realm, faction: store.playerFaction })
+    this.contestEnterT = 2.8
+    this.contestClock = 150
+    store.setContest({
+      phase: 'entering',
+      opponent: this.contest.opponentName,
+      faction: this.contest.opponentFaction,
+      hp: this.contest.opponentHp,
+      maxHp: this.contest.opponentMaxHp,
+      seconds: this.contestClock,
+      reward: null,
+    })
+    this.updateCamera(1, true)
+  }
+
+  /** 结算：胜则发贡献与宝箱，负则倒扣并送出场外 */
+  private finishContest(won: boolean) {
+    const store = useGameStore.getState()
+    const opponent = this.contest.opponentName
+    this.contest.freeze()
+    let reward: string | null = null
+    if (won) {
+      const gained = 90 + store.realm * 30
+      const roll = Math.random()
+      if (roll < 0.4) {
+        store.absorbCore('大比宝箱 · 龙筋内丹', 0)
+        reward = `宗门贡献 +${gained} · 宝箱开出一枚内丹`
+      } else if (roll < 0.75) {
+        store.grantJade(18 + store.realm * 4, '大比宝箱 · 仙玉盈匣')
+        reward = `宗门贡献 +${gained} · 宝箱开出仙玉`
+      } else {
+        store.addRelic('大比宝箱 · 玄冰鱼饵')
+        reward = `宗门贡献 +${gained} · 宝箱稀有材料入囊`
+      }
+      store.grantContribution(gained, `力压心魔 · 贡献 +${gained}`)
+    } else {
+      const penalty = Math.min(store.contribution, 30 + store.realm * 6)
+      if (penalty > 0) {
+        store.spendContribution(penalty)
+        reward = `倒扣宗门贡献 ${penalty} · 心魔未除`
+      } else {
+        reward = '贡献本就见底 · 只当挨了一场闷棍'
+      }
+    }
+    store.recordContestResult(won, opponent)
+    store.setContest({
+      phase: won ? 'won' : 'lost',
+      opponent,
+      faction: this.contest.opponentFaction,
+      hp: this.contest.opponentHp,
+      maxHp: this.contest.opponentMaxHp,
+      seconds: Math.round(this.contestClock),
+      reward,
+    })
+  }
+
+  /** 结算界面点「离场」：输赢都送回接引仙阵外 */
+  private leaveContest() {
+    const store = useGameStore.getState()
+    this.contest.end()
+    store.setContest(null)
+    this.boat.position.set(CELESTIAL_SPAWN.x, 0, CELESTIAL_SPAWN.z)
+    this.boat.speed = 0
+    this.boat.group.rotation.set(0, 0, 0)
+    this.updateCamera(1, true)
+    if (!store.dead) store.healPlayer(Math.round(maxHpFor(store.realm) * 0.35))
+    store.toast('光幕散去 · 擂台重归寂静', 'info')
+  }
+
+  /** 打中心魔：血条当场更新，镜像脚下炸开一团云气 */
+  private contestFeedback() {
+    const store = useGameStore.getState()
+    const hud = store.contest
+    if (!hud || hud.phase !== 'fighting') return
+    store.setContest({ ...hud, hp: this.contest.opponentHp, maxHp: this.contest.opponentMaxHp })
+    const mirror = this.contest.opponentPosition
+    if (mirror) this.celestial.burst(mirror, 12)
+  }
+
+  private updateContest(dt: number, time: number, store: ReturnType<typeof useGameStore.getState>) {
+    if (!this.contest.active) return
+    const hud = store.contest
+    if (!hud) return
+
+    if (hud.phase === 'entering') {
+      this.contestEnterT -= dt
+      this.contest.update(dt, time, this.boat.position)
+      if (this.contestEnterT <= 0) {
+        store.setContest({ ...hud, phase: 'fighting' })
+        store.toast(`${this.contest.opponentName}出手了 · 别客气`, 'danger')
+      }
+      return
+    }
+
+    if (hud.phase !== 'fighting') {
+      this.contest.update(dt, time, this.boat.position)
+      return
+    }
+
+    // 战斗中翻开背包/图鉴等于把擂台暂停，镜像不会趁你低头时下黑手
+    if (store.underwater || isModalOpen(store)) return
+
+    this.contestClock = Math.max(0, this.contestClock - dt)
+    const tick = this.contest.update(dt, time, this.boat.position)
+
+    if (tick.damage > 0) {
+      const faction = factionOf(store.playerFaction)
+      if (faction.dodgeChance > 0 && Math.random() < faction.dodgeChance) {
+        store.toast(`${tick.label}扑了个空 · 仙诀闪避`, 'gold')
+      } else {
+        const dmg = Math.max(1, Math.round(tick.damage * faction.hurtMul))
+        const left = store.hp - dmg
+        // 擂台判负不走普通死亡：渔获不掉，只把人打到悬一线
+        if (left <= 0) {
+          store.setHp(1)
+          this.finishContest(false)
+          return
+        }
+        store.setHp(left)
+        store.toast(
+          `${tick.label}造成 ${dmg} 点伤害 · 生命 ${left}/${maxHpFor(store.realm)}`,
+          'danger',
+        )
+      }
+    }
+
+    if (this.contest.opponentHp <= 0) {
+      this.finishContest(true)
+      return
+    }
+    if (this.contestClock <= 0) {
+      // 时限到，按剩余生命判定胜负
+      this.finishContest(this.contest.opponentHp / this.contest.opponentMaxHp < store.hp / maxHpFor(store.realm))
+      return
+    }
+
+    this.contestHudTimer -= dt
+    if (this.contestHudTimer <= 0) {
+      this.contestHudTimer = 0.2
+      store.setContest({
+        ...hud,
+        hp: this.contest.opponentHp,
+        maxHp: this.contest.opponentMaxHp,
+        seconds: Math.ceil(this.contestClock),
+      })
+    }
+  }
+
   private onCelestialSummon(x: number, z: number) {
     const store = useGameStore.getState()
     this.boat.getForward(this.forward)
     this.pathPoint.set(x, this.world.waveHeight(x, z, this.elapsed), z)
     this.celestial.burst(this.pathPoint, 26)
+    // 结界把场外雷暴挡在光幕之外，否则一场大比会被天雷金鳗直接判死
+    if (this.contest.active) {
+      store.toast('雷云劈在光幕上 · 擂台不接场外伤害', 'info')
+      return
+    }
     this.world.setDoom(0.6)
     this.celestialDoomTimer = 4.5
     store.damagePlayer(14, '天雷金鳗引来的雷暴')
@@ -1615,6 +1949,19 @@ export class Game {
     if (store.underwater || this.fishing.phase !== 'idle') return null
     const boat = this.boat.position
     if (this.world.isCelestial) {
+      const sect = this.sectHalls.nearestGate(boat)
+      if (sect) {
+        const elder = SECT_ELDERS[sect.faction]
+        const allowed = sect.faction === store.playerFaction
+        return {
+          kind: 'sect' as const,
+          id: sect.faction,
+          prompt: allowed
+            ? `${elder.role} · ${elder.name}在门前等你`
+            : '山门光幕横亘 · 异宗门人不得擅入',
+          label: allowed ? '入宗' : null,
+        }
+      }
       const merchant = this.celestial.merchantPosition
       const merchantDistance = Math.hypot(boat.x - merchant.x, boat.z - merchant.z)
       if (merchantDistance < 13) {
@@ -1749,6 +2096,8 @@ export class Game {
     this.crossApplied = false
     this.ascendT = 0
     this.travelTarget = null
+    this.setSwordFlight(false)
+    this.thunderCd = 0
     this.avatar.group.visible = true
     useGameStore.getState().setAscension(null)
     this.boat.position.set(SPAWN.x, 0, SPAWN.z)
@@ -2023,6 +2372,9 @@ export class Game {
     if (input.consumeSkillWater()) this.cultivation.castWater(this.cultPlayer)
     if (input.consumeSkillSword()) this.cultivation.castSword(this.cultPlayer)
 
+    if (input.consumeThunder()) this.castThunderLure(store)
+    if (input.consumeFlight()) this.toggleSwordFlight(store)
+
     if (input.consumeAnchor()) {
       if (!store.installedFacilities.includes('anchor')) {
         store.toast('船上还没有锚，去船坞装一个', 'info')
@@ -2151,7 +2503,11 @@ export class Game {
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
     this.seaEvents.strike(origin, this.viewDir, range, damage)
     if (hits) this.applyLeech(damage * faction.lifesteal, '渔刀饮血')
-    if (isOnBoat && !hits) {
+    if (this.contest.strike(origin, range, damage, this.viewDir)) {
+      this.applyLeech(damage * faction.lifesteal, '一刀斩向心魔')
+      this.contestFeedback()
+    }
+    if (isOnBoat && !hits && !this.contest.active) {
       const fish = this.findBoatFish(range, 0.1)
       if (fish) this.catchSurfaceFish(fish, 0.62)
     }
@@ -2186,6 +2542,7 @@ export class Game {
     )
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
+    const pierced = this.contest.strike(origin, def.range, damage, this.viewDir)
     if (hit) this.applyLeech(damage * faction.lifesteal, '鱼枪饮血')
     if (hit) {
       this.showSpearRope(hit.point)
@@ -2193,7 +2550,18 @@ export class Game {
       audio.snap()
       return
     }
-    if (isOnBoat) {
+    if (pierced) {
+      this.applyLeech(damage * faction.lifesteal, '一枪钉穿心魔')
+      const mirror = this.contest.opponentPosition
+      if (mirror) {
+        this.showSpearRope(mirror, 0.6)
+        this.flashMuzzle(mirror)
+      }
+      this.contestFeedback()
+      audio.snap()
+      return
+    }
+    if (isOnBoat && !this.contest.active) {
       const fish = this.findBoatFish(def.range, 0.7)
       if (fish) {
         this.showSpearRope(fish.group.position, 0.6)
@@ -2342,6 +2710,18 @@ export class Game {
       const info = this.resolveInteract(store)
       if (!info) {
         if (skillUnlocked(SKILLS[1], store.realm)) this.cultivation.castFire(this.cultPlayer)
+        return
+      }
+      if (info.kind === 'sect') {
+        if (this.fishing.phase !== 'idle') {
+          store.toast('先收线，再入山门', 'info')
+          return
+        }
+        if (info.id !== store.playerFaction) {
+          store.toast('这道山门只渡自己门人 · 请回吧', 'danger')
+          return
+        }
+        store.setSectAt(info.id as FactionId)
         return
       }
       if (info.kind === 'merchant') {
@@ -2789,7 +3169,12 @@ export class Game {
     this.dragonRace.dispose()
     this.unsubAscension?.()
     this.unsubSummon?.()
+    this.unsubRegister?.()
+    this.unsubLeaveContest?.()
     this.celestial.dispose()
+    this.sectHalls.dispose()
+    this.thunder.dispose()
+    this.contest.dispose()
     this.gate.dispose()
     this.achievements.dispose()
     this.post.dispose()

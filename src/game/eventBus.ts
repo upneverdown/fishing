@@ -26,6 +26,8 @@ export interface GameEventMap {
   'thunderlure:strike': { x: number; z: number; radius: number; catches: number }
   'contest:win': { opponent: string }
   'contest:loss': { opponent: string }
+  'contest:register': { faction: FactionId }
+  'contest:leave': { won: boolean }
 }
 
 type Handler<T> = (payload: T) => void

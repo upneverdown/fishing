@@ -425,6 +425,8 @@ export class Boat {
   private collisionHalfLength = 1.5
   private impactPower = 0
   boostActive = false
+  /** 御剑飞行：离水高度，0 表示仍在水面 */
+  flyHeight = 0
   private builtSkin: BoatSkinId | null = null
   private night = false
   private pirateLanternLight: THREE.PointLight | null = null
@@ -1890,7 +1892,11 @@ export class Boat {
       const nextX = this.position.x + forward.x * step
       const nextZ = this.position.z + forward.z * step
 
-      if (this.canOccupy(nextX, nextZ, world)) {
+      if (this.flyHeight > 0.2) {
+        // 踏剑凌虚：礁石与浅滩都从脚下让开
+        this.position.x = nextX
+        this.position.z = nextZ
+      } else if (this.canOccupy(nextX, nextZ, world)) {
         this.position.x = nextX
         this.position.z = nextZ
       } else if (
@@ -1922,12 +1928,16 @@ export class Boat {
 
     const wave = world.waveHeight(this.position.x, this.position.z, time)
     const bob = Math.sin(time * 1.15 + this.bobPhase)
-    this.group.position.y = wave + 0.04 + bob * 0.032 * this.bobMul
+    const flying = this.flyHeight > 0.2
+    this.group.position.y =
+      wave + 0.04 + this.flyHeight + bob * (flying ? 0.012 : 0.032) * this.bobMul
     this.group.rotation.y = this.heading
-    this.group.rotation.z =
-      -steer * 0.07 + Math.sin(time * 1.35 + this.bobPhase) * 0.022 * this.bobMul
-    this.group.rotation.x =
-      bob * 0.018 * this.bobMul + clamp(this.speed * 0.006, -0.03, 0.04)
+    this.group.rotation.z = flying
+      ? -steer * 0.3 + Math.sin(time * 0.9 + this.bobPhase) * 0.05
+      : -steer * 0.07 + Math.sin(time * 1.35 + this.bobPhase) * 0.022 * this.bobMul
+    this.group.rotation.x = flying
+      ? clamp(this.speed * 0.012, -0.08, 0.09)
+      : bob * 0.018 * this.bobMul + clamp(this.speed * 0.006, -0.03, 0.04)
 
     if (this.oarLeft && this.oarRight) {
       const rowing = Math.abs(throttle) > 0.08 ? 1 : Math.min(Math.abs(this.speed) / 4, 0.35)

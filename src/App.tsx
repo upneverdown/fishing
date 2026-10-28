@@ -35,6 +35,8 @@ import { CultivationHud } from '@/components/CultivationHud'
 import { TribulationOverlay } from '@/components/TribulationOverlay'
 import { AscensionOverlay } from '@/components/AscensionOverlay'
 import { FactionChoiceOverlay } from '@/components/FactionChoiceOverlay'
+import { SectDialog } from '@/components/SectDialog'
+import { ContestOverlay } from '@/components/ContestOverlay'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 
@@ -92,6 +94,7 @@ export default function App() {
           <TribulationOverlay />
           <AscensionOverlay />
           <FactionChoiceOverlay />
+          <ContestOverlay />
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (
@@ -117,6 +120,7 @@ export default function App() {
       <AchievementsPanel />
       <CrewPanel />
       <PlayerSkinShop />
+      <SectDialog />
 
       <AnimatePresence>
         {!started && <IntroScreen onStart={() => undefined} />}

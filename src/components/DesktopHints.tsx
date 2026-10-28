@@ -32,6 +32,8 @@ export function DesktopHints() {
   const combatCamera = useGameStore((s) => s.combatCamera)
   const ascended = useGameStore((s) => s.ascended)
   const celestial = useGameStore((s) => s.mapZone === 'celestial')
+  const thunder = useGameStore((s) => s.equippedTechniques.includes('thunderlure'))
+  const flight = useGameStore((s) => s.equippedTechniques.includes('swordflight'))
   const hints = HINTS.map((hint) =>
     hint.keys[0] === 'V'
       ? {
@@ -47,6 +49,8 @@ export function DesktopHints() {
       : hint,
   )
   if (ascended) hints.push({ keys: ['P'], label: celestial ? '传送回凡间' : '传送至天界' })
+  if (thunder) hints.push({ keys: ['U'], label: '天雷引 · 雷域麻鱼' })
+  if (flight) hints.push({ keys: ['O'], label: '御剑飞行 · 踏剑离水' })
 
   return (
     <div className="pointer-events-none absolute bottom-4 left-5 z-20 hidden sm:block">
