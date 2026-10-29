@@ -37,6 +37,10 @@ import { AscensionOverlay } from '@/components/AscensionOverlay'
 import { FactionChoiceOverlay } from '@/components/FactionChoiceOverlay'
 import { SectDialog } from '@/components/SectDialog'
 import { ContestOverlay } from '@/components/ContestOverlay'
+import { DemonQuizOverlay } from '@/components/DemonQuizOverlay'
+import { EpiphanyNotice } from '@/components/EpiphanyNotice'
+import { VitalHud } from '@/components/VitalHud'
+import { WeaponBar } from '@/components/WeaponBar'
 import { useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
 
@@ -95,6 +99,10 @@ export default function App() {
           <AscensionOverlay />
           <FactionChoiceOverlay />
           <ContestOverlay />
+          <DemonQuizOverlay />
+          <EpiphanyNotice />
+          <VitalHud />
+          {!underwater && <WeaponBar />}
           {underwater ? (
             <UnderwaterHud />
           ) : isTouch ? (

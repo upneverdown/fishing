@@ -1,6 +1,11 @@
 import * as THREE from 'three'
 import type { Boat } from '@/game/entities/boat'
-import { crewById, type CrewDef } from '@/game/crew/crew'
+import {
+  crewById,
+  crewCatchCoins,
+  crewFishingInterval,
+  type CrewDef,
+} from '@/game/crew/crew'
 import { useGameStore } from '@/store/useGameStore'
 import { createCatch, pickFish } from '@/game/fishing/fishTable'
 import { gameEvents } from '@/game/eventBus'
@@ -226,7 +231,7 @@ export class CrewSystem {
         fig.rod.rotation.x = -0.1 + Math.sin(time * 2.2 + fig.phase) * 0.05
         if (fig.cast <= 0) {
           fig.state = 'idle'
-          fig.timer = FISHING_INTERVAL
+          fig.timer = crewFishingInterval(this.affinityOf(fig.def.id), FISHING_INTERVAL)
           fig.wait = 1.5
           fig.rod.visible = false
           this.landCatch(fig)
@@ -235,19 +240,25 @@ export class CrewSystem {
     }
   }
 
+  private affinityOf(id: string) {
+    return useGameStore.getState().crewAffinity[id] ?? 0
+  }
+
   private landCatch(fig: Figure) {
     const state = useGameStore.getState()
     const def = pickFish(2.4, { season: state.season })
     const caught = createCatch(def, 'rod')
     const added = state.addCatch(caught)
-    state.grantMoney(20, `船员 ${fig.def.name} 的渔获分成`)
+    // 鱼干喂出来的好感直接折进分成里
+    const coins = crewCatchCoins(this.affinityOf(fig.def.id))
+    state.grantMoney(coins, `船员 ${fig.def.name} 的渔获分成`)
     state.showCrewCatch(
-      `船员[${fig.def.name}]为你钓上了一条[${def.name}]，获得金币+20${added ? '' : '（鱼篓已满，鱼放回了海里）'}`,
+      `船员[${fig.def.name}]为你钓上了一条[${def.name}]，获得金币+${coins}${added ? '' : '（鱼篓已满，鱼放回了海里）'}`,
     )
     gameEvents.emit('crew:catch', {
       crewName: fig.def.name,
       fishName: def.name,
-      coins: 20,
+      coins,
     })
   }
 

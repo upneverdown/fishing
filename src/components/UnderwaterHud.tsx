@@ -527,7 +527,7 @@ export function UnderwaterHud() {
             </div>
           </div>
 
-          <div className="pointer-events-none absolute bottom-4 left-5 z-20 hidden lg:block">
+          <div className="pointer-events-none absolute bottom-4 right-5 z-20 hidden lg:block">
             <div className="glass rounded-xl px-3 py-2.5">
               <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-foam/40">
                 <Keyboard className="size-3" />

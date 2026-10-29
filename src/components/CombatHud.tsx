@@ -1,18 +1,15 @@
 import {
   Anchor,
-  Crosshair,
   Flame,
   Flashlight,
   Heart,
   Radar,
   RotateCcw,
   Skull,
-  Sword,
   Video,
 } from 'lucide-react'
 import { maxHpFor, useGameStore } from '@/store/useGameStore'
 import { suppressionLabel } from '@/game/cultivation/realms'
-import { WEAPONS, weaponById } from '@/game/combat/weapons'
 import { facilityById } from '@/game/boat/facilities'
 import { useNow } from '@/components/town/shared'
 import { cn } from '@/lib/utils'
@@ -23,49 +20,6 @@ const CONTACT_COLOR: Record<RadarContact['kind'], string> = {
   shark: '#ff7a5f',
   whale: '#b57cff',
   boss: '#ffb13d',
-}
-
-function WeaponButton({ id }: { id: (typeof WEAPONS)[number]['id'] }) {
-  const def = weaponById(id)
-  const owned = useGameStore((s) => s.ownedWeapons.includes(id))
-  const equipped = useGameStore((s) => s.equippedWeapon === id)
-  const ammo = useGameStore((s) => s.weaponAmmo[id] ?? 0)
-  const equipWeapon = useGameStore((s) => s.equipWeapon)
-  const toast = useGameStore((s) => s.toast)
-  if (!def) return null
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (!owned) {
-          toast(`${def.name}还没买 · 去小镇渔具铺看看`, 'info')
-          return
-        }
-        equipWeapon(id)
-      }}
-      className={cn(
-        'pointer-events-auto relative flex min-w-0 flex-1 flex-col gap-0.5 rounded-lg border px-1.5 py-1 text-left transition-colors',
-        equipped
-          ? 'border-gold/45 bg-gold/8 text-gold'
-          : owned
-            ? 'border-border/50 bg-abyss/40 text-foam/60 hover:border-foam/25'
-            : 'border-border/30 bg-abyss/25 text-foam/30',
-      )}
-      title={`${def.name} · ${def.notes[0]}`}
-    >
-      <span className="flex items-center justify-between gap-1">
-        {id === 'knife' ? <Sword className="size-3" /> : <Crosshair className="size-3" />}
-        <span className="tnum text-[8px] opacity-70">
-          {!owned ? '未购' : def.ammoMax > 0 ? `${ammo}/${def.ammoMax}` : '∞'}
-        </span>
-      </span>
-      <span className="truncate text-[9.5px] font-medium">{def.name}</span>
-      <span className="hidden text-[7.5px] tracking-[0.12em] opacity-50 sm:block">
-        {id === 'knife' ? 'J' : 'K'}
-      </span>
-    </button>
-  )
 }
 
 function FacilityButton({ id }: { id: FacilityId }) {
@@ -98,7 +52,6 @@ function FacilityButton({ id }: { id: FacilityId }) {
 function StatusPanel() {
   const hp = useGameStore((s) => s.hp)
   const realm = useGameStore((s) => s.realm)
-  const faction = useGameStore((s) => s.playerFaction)
   const installed = useGameStore((s) => s.installedFacilities)
   const active = useGameStore((s) => s.facilityActive)
   const maxHp = maxHpFor(realm)
@@ -111,49 +64,21 @@ function StatusPanel() {
   return (
     <div
       className={cn(
-        'pointer-events-none absolute left-3 top-[30%] z-20 w-[9.8rem] rounded-xl border bg-[#072226]/86 p-2 shadow-[0_18px_50px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md sm:left-5 sm:w-[10.4rem]',
+        'pointer-events-none absolute left-3 top-[22%] z-20 w-[9.8rem] rounded-xl border bg-[#072226]/86 p-2 shadow-[0_18px_50px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md sm:left-5 sm:w-[10.4rem]',
         low ? 'border-destructive/55' : 'border-foam/12',
       )}
     >
-      <div className="flex items-center justify-between text-[8.5px] uppercase tracking-[0.18em]">
-        <span className={cn('flex items-center gap-1', low ? 'text-destructive' : 'text-foam/45')}>
-          <Heart className={cn('size-3', low && 'animate-pulse')} />
-          生命
+      <div className="flex items-center justify-between text-[8.5px] uppercase tracking-[0.18em] text-foam/45">
+        <span className="flex items-center gap-1">
+          <Anchor className="size-3" />
+          船载设施
         </span>
-        <span className={cn('tnum text-[10px] font-semibold', low ? 'text-destructive' : 'text-foam/75')}>
-          {hp}/{maxHp}
+        <span className="truncate text-[7.5px] tracking-[0.08em] text-foam/30">
+          {anchored ? '已抛锚' : active.searchlight ? '探照灯' : '船上'}
         </span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-foam/10">
-        <div
-          className="h-full rounded-full transition-[width] duration-300"
-          style={{
-            width: `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`,
-            background: low
-              ? 'linear-gradient(90deg,#e2685a,#ff9a6b)'
-              : faction === 'immortal'
-                ? 'linear-gradient(90deg,#3fd8c6,#9ff0ff)'
-                : faction === 'demon'
-                  ? 'linear-gradient(90deg,#7c1a20,#d2503f)'
-                  : 'linear-gradient(90deg,#6fe0cf,#a8f0e1)',
-            boxShadow: low
-              ? '0 0 12px #e2685a88'
-              : faction === 'demon'
-                ? '0 0 12px #8e1f2688'
-                : faction === 'immortal'
-                  ? '0 0 12px #6fe0cf88'
-                  : '0 0 12px #6fe0cf55',
-          }}
-        />
       </div>
 
-      <div className="mt-2 flex items-stretch gap-1">
-        {WEAPONS.map((weapon) => (
-          <WeaponButton key={weapon.id} id={weapon.id} />
-        ))}
-      </div>
-
-      {quick.length > 0 && (
+      {quick.length > 0 ? (
         <div className="mt-1.5 flex items-center gap-1 border-t border-white/6 pt-1.5">
           {quick.map((id) => (
             <FacilityButton key={id} id={id} />
@@ -171,9 +96,10 @@ function StatusPanel() {
               </span>
             )
           })}
-          <span className="ml-auto truncate text-[7.5px] tracking-[0.08em] text-foam/30">
-            {anchored ? '已抛锚' : active.searchlight ? '探照灯' : '船上'}
-          </span>
+        </div>
+      ) : (
+        <div className="mt-1 text-[9px] leading-tight text-foam/35">
+          还没有装设施 · 去船坞添一副锚和探照灯
         </div>
       )}
     </div>

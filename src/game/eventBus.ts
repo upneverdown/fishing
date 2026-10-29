@@ -28,6 +28,13 @@ export interface GameEventMap {
   'contest:loss': { opponent: string }
   'contest:register': { faction: FactionId }
   'contest:leave': { won: boolean }
+  'fish:blank': { blank: boolean; zone: MapZone }
+  'driedfish:made': { count: number }
+  'driedfish:eaten': { heal: number }
+  'demon:answer': { value: string; timeout: boolean }
+  'demon:dismiss': { won: boolean }
+  'demon:win': { rounds: number }
+  'demon:loss': Record<string, never>
 }
 
 type Handler<T> = (payload: T) => void

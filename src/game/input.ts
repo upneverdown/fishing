@@ -11,6 +11,7 @@ class InputController {
   private keys = new Set<string>()
   private actionSources = new Set<string>()
   private actionPress = false
+  private firePress = false
   private interactPress = false
   private bagPress = false
   private shopPress = false
@@ -82,6 +83,8 @@ class InputController {
       this.pointerTravel = 0
       return
     }
+    // 船上左键既是抛竿蓄力，也是锁定目标时的一发出手，谁先消费谁拿走
+    this.firePress = true
     this.pressAction('pointer')
   }
 
@@ -194,6 +197,18 @@ class InputController {
     const pressed = this.actionPress
     this.actionPress = false
     return pressed
+  }
+
+  /** 左键的一次按下：武器优先消费，没开火才留给鱼竿 */
+  consumeFire() {
+    const pressed = this.firePress
+    this.firePress = false
+    return pressed
+  }
+
+  /** 开火成功后收回这次按下，免得同一记左键又去蓄力抛竿 */
+  cancelActionPress() {
+    this.actionPress = false
   }
 
   consumeInteract() {
@@ -422,6 +437,7 @@ class InputController {
     this.actionSources.clear()
     this.actionDown = false
     this.actionPress = false
+    this.firePress = false
     this.interactPress = false
     this.bagPress = false
     this.shopPress = false
@@ -460,6 +476,7 @@ class InputController {
 
   clearQueued() {
     this.actionPress = false
+    this.firePress = false
     this.interactPress = false
     this.bagPress = false
     this.shopPress = false

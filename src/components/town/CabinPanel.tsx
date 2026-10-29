@@ -1,5 +1,5 @@
 import { Heart, Home, PawPrint, Sparkles, Star, Waves } from 'lucide-react'
-import { useGameStore } from '@/store/useGameStore'
+import { DRIED_FISH_KEY, useGameStore } from '@/store/useGameStore'
 import { FISH, RARITIES } from '@/game/fishing/fishTable'
 import { SEASONS } from '@/game/world/seasons'
 import {
@@ -40,6 +40,8 @@ export function CabinPanel() {
   const feed = useGameStore((s) => s.feedPet)
   const play = useGameStore((s) => s.playPet)
   const pat = useGameStore((s) => s.patPet)
+  const dried = useGameStore((s) => s.pantry[DRIED_FISH_KEY] ?? 0)
+  const feedDriedFish = useGameStore((s) => s.feedPetDriedFish)
   const season = useGameStore((s) => s.season)
   const now = useNow(1000)
   const stage = petStage(pet.affection)
@@ -145,10 +147,16 @@ export function CabinPanel() {
             </div>
           </div>
 
-          <div className="mt-2 grid grid-cols-3 gap-1.5">
+          <div className="mt-2 grid grid-cols-4 gap-1.5">
             <PetButton label="喂食" hint={feedLeft > 0 ? `${Math.ceil(feedLeft / 1000)}s` : '消耗一条鱼'} disabled={feedLeft > 0} onClick={feed} />
             <PetButton label="玩耍" hint={playLeft > 0 ? `${Math.ceil(playLeft / 1000)}s` : '好感 +6'} disabled={playLeft > 0} onClick={play} />
             <PetButton label="摸摸" hint={patLeft > 0 ? `${Math.ceil(patLeft / 1000)}s` : '好感 +2'} disabled={patLeft > 0} onClick={pat} />
+            <PetButton
+              label="鱼干"
+              hint={dried > 0 ? `存货 ${dried} · 好感 +6` : '先去晒几条'}
+              disabled={dried === 0}
+              onClick={feedDriedFish}
+            />
           </div>
 
           <div

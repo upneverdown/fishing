@@ -75,3 +75,18 @@ export function crewOxygenMul(ids: readonly string[]) {
 export function crewRepairsHull(ids: readonly string[]) {
   return ids.includes('carpenter')
 }
+
+export const CREW_AFFINITY_MAX = 100
+
+/** 好感度兑成产出：满好感时渔获分成翻倍、收线节奏快三分之一 */
+export function crewAffinityBonus(affinity: number) {
+  return Math.max(0, Math.min(1, affinity / CREW_AFFINITY_MAX))
+}
+
+export function crewCatchCoins(affinity: number, base = 20) {
+  return Math.round(base * (1 + crewAffinityBonus(affinity)))
+}
+
+export function crewFishingInterval(affinity: number, base: number) {
+  return base * (1 - crewAffinityBonus(affinity) * 0.34)
+}

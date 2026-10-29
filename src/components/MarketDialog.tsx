@@ -12,12 +12,17 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { Group, Panel, Separator } from 'react-resizable-panels'
-import { Anchor, Check, Coins, GripVertical, PackageOpen, ShoppingBasket, X } from 'lucide-react'
+import { Anchor, Check, Coins, GripVertical, PackageOpen, ShoppingBasket, Sun, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { FishArt } from '@/components/FishArt'
 import { RarityDot } from '@/components/RarityBadge'
-import { bagCapacity, currentDailyFactor, useGameStore } from '@/store/useGameStore'
+import {
+  DRIED_FISH_KEY,
+  bagCapacity,
+  currentDailyFactor,
+  useGameStore,
+} from '@/store/useGameStore'
 import { freshnessOf, marketQuote } from '@/game/economy/market'
 import { SEASONS } from '@/game/world/seasons'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -126,6 +131,8 @@ export function MarketDialog() {
   const money = useGameStore((s) => s.money)
   const sellOne = useGameStore((s) => s.sellOne)
   const sellAll = useGameStore((s) => s.sellAll)
+  const dryFish = useGameStore((s) => s.dryFish)
+  const dried = useGameStore((s) => s.pantry[DRIED_FISH_KEY] ?? 0)
   const season = useGameStore((s) => s.season)
   const cabinLevel = useGameStore((s) => s.cabinLevel)
   const dailySold = useGameStore((s) => s.dailySold)
@@ -150,6 +157,7 @@ export function MarketDialog() {
     [bag, season, cabinLevel, dailySold, livewell],
   )
   const dailyFactor = currentDailyFactor()
+  const dryCount = bag.filter((c) => !c.junk).length
 
   const recordSale = (c: Catch, value: number) => {
     setSales((prev) => [{ id: c.id, name: c.name, value }, ...prev].slice(0, 4))
@@ -297,6 +305,22 @@ export function MarketDialog() {
                     >
                       <Check className="size-3" />
                       全部卖出 ¥{total}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border border-border/40 bg-card/30 px-2.5 py-1.5">
+                    <span className="text-[10px] text-muted-foreground">
+                      风尾晒架 · 现有鱼干 <span className="tnum text-gold">{dried}</span> 条
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => dryFish()}
+                      disabled={dryCount === 0}
+                      variant="ghost"
+                      className="h-7 gap-1 rounded-full bg-tide/12 px-2.5 text-[10.5px] text-tide hover:bg-tide/20"
+                    >
+                      <Sun className="size-3" />
+                      晒成鱼干
                     </Button>
                   </div>
 

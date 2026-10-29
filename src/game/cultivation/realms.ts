@@ -17,7 +17,7 @@ export const REALMS: RealmDef[] = [
     id: 'lianqi',
     name: '炼气期',
     short: '炼气',
-    requiredXp: 1000,
+    requiredXp: 700,
     attackMul: 1,
     hpMul: 1,
     speedMul: 1,
@@ -29,7 +29,7 @@ export const REALMS: RealmDef[] = [
     id: 'zhuji',
     name: '筑基期',
     short: '筑基',
-    requiredXp: 2000,
+    requiredXp: 1400,
     attackMul: 1.1,
     hpMul: 1.1,
     speedMul: 1.1,
@@ -41,7 +41,7 @@ export const REALMS: RealmDef[] = [
     id: 'jindan',
     name: '金丹期',
     short: '金丹',
-    requiredXp: 3600,
+    requiredXp: 2500,
     attackMul: 1.22,
     hpMul: 1.22,
     speedMul: 1.2,
@@ -53,7 +53,7 @@ export const REALMS: RealmDef[] = [
     id: 'yuanying',
     name: '元婴期',
     short: '元婴',
-    requiredXp: 6000,
+    requiredXp: 4200,
     attackMul: 1.36,
     hpMul: 1.36,
     speedMul: 1.3,
@@ -101,16 +101,22 @@ export interface CoreSpec {
 }
 
 const CORE_BY_KIND: Record<string, CoreSpec> = {
-  thunderdragon: { name: '雷龙仙丹', xp: 420, color: '#ffe6a8', size: 0.74 },
-  dragon: { name: '龙族内丹', xp: 200, color: '#f6d477', size: 0.62 },
-  stormeel: { name: '雷鳗内丹', xp: 220, color: '#bfe9ff', size: 0.5 },
-  turtle: { name: '玄龟内丹', xp: 140, color: '#9fe0b4', size: 0.52 },
-  whale: { name: '鲸落内丹', xp: 110, color: '#8ecbff', size: 0.46 },
-  shark: { name: '鲨丹', xp: 60, color: '#b8d7de', size: 0.36 },
+  thunderdragon: { name: '雷龙仙丹', xp: 700, color: '#ffe6a8', size: 0.74 },
+  dragon: { name: '龙族内丹', xp: 330, color: '#f6d477', size: 0.62 },
+  stormeel: { name: '雷鳗内丹', xp: 360, color: '#bfe9ff', size: 0.5 },
+  turtle: { name: '玄龟内丹', xp: 230, color: '#9fe0b4', size: 0.52 },
+  whale: { name: '鲸落内丹', xp: 180, color: '#8ecbff', size: 0.46 },
+  shark: { name: '鲨丹', xp: 105, color: '#b8d7de', size: 0.36 },
 }
 
 export function coreSpec(kind: string): CoreSpec {
   return CORE_BY_KIND[kind] ?? CORE_BY_KIND.shark
+}
+
+/** 顿悟：可遇不可求，一来就顶得上半个大境界 */
+export function epiphanyXp(realmIndex: number) {
+  const need = realmAt(realmIndex).requiredXp
+  return Number.isFinite(need) ? Math.round(need * 0.75) : 3200
 }
 
 export type SkillId = 'water' | 'fire' | 'sword'

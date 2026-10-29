@@ -14,11 +14,14 @@ const HINTS = [
   { keys: ['X'], label: '鱼饵' },
   { keys: ['T'], label: '季节' },
   { keys: ['V'], label: '潜入水下' },
-  { keys: ['J'], label: '挥刀' },
-  { keys: ['K'], label: '鱼枪' },
+  { keys: ['1'], label: '近战兵器（再按轮换）' },
+  { keys: ['2'], label: '远程兵器（再按轮换）' },
+  { keys: ['3'], label: '轮换捕捞工具' },
+  { keys: ['J'], label: '近战出手' },
+  { keys: ['K'], label: '远程出手' },
   { keys: ['Y'], label: '抛锚' },
   { keys: ['L'], label: '探照灯' },
-  { keys: ['H'], label: '船载烤鱼' },
+  { keys: ['H'], label: '嚼鱼干 / 船载烤鱼' },
   { keys: ['Z'], label: '切换工具型号' },
   { keys: ['N'], label: '成就' },
   { keys: ['M'], label: '船员名册' },
@@ -53,7 +56,7 @@ export function DesktopHints() {
   if (flight) hints.push({ keys: ['O'], label: '御剑飞行 · 踏剑离水' })
 
   return (
-    <div className="pointer-events-none absolute bottom-4 left-5 z-20 hidden sm:block">
+    <div className="pointer-events-none absolute bottom-4 right-5 z-20 hidden sm:block">
       <div className="glass rounded-xl px-3 py-2.5">
         <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-foam/40">
           <Keyboard className="size-3" />

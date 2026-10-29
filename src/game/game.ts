@@ -10,7 +10,13 @@ import { FACTIONS, factionOf, type FactionId } from '@/game/cultivation/factions
 import { UnderwaterWorld } from '@/game/underwater/underwaterWorld'
 import { UnderwaterPost } from '@/game/render/underwaterPost'
 import { input } from '@/game/input'
-import { bagCapacity, isModalOpen, maxHpFor, useGameStore } from '@/store/useGameStore'
+import {
+  DRIED_FISH_KEY,
+  bagCapacity,
+  isModalOpen,
+  maxHpFor,
+  useGameStore,
+} from '@/store/useGameStore'
 import { gameEvents } from '@/game/eventBus'
 import { AchievementManager } from '@/game/achievements/achievementManager'
 import { CrewSystem } from '@/game/crew/crewSystem'
@@ -39,14 +45,22 @@ import { CelestialScene, CELESTIAL_SPAWN } from '@/game/celestial/celestialScene
 import { AscensionGate } from '@/game/celestial/ascensionGate'
 import { boatCanFly } from '@/game/shop/catalog'
 import { CultivationManager, type CultivationPlayer } from '@/game/cultivation/cultivationManager'
-import { SKILLS, realmAttackMul, realmSpeedMul, skillUnlocked } from '@/game/cultivation/realms'
+import {
+  SKILLS,
+  epiphanyXp,
+  realmAttackMul,
+  realmSpeedMul,
+  skillUnlocked,
+} from '@/game/cultivation/realms'
 import { SectHalls, SECT_ELDERS } from '@/game/sect/sectHalls'
 import { ThunderLure } from '@/game/sect/thunderlure'
 import { ContestArena, CONTEST_POINT } from '@/game/sect/contestArena'
+import { InnerDemon } from '@/game/demon/innerDemon'
+import { isCorrectAnswer, randomQuiz, type QuizDef } from '@/game/demon/quizBank'
 import { equippedLevel, fishingBlessing, hasTechnique, FISH_XP_BY_RARITY } from '@/game/sect/blessings'
 import { techniqueById, techniqueValue } from '@/game/sect/techniques'
 import { CAMPFIRE_RADIUS, DockLife } from '@/game/world/dockLife'
-import { weaponById } from '@/game/combat/weapons'
+import { WEAPONS, weaponById, type WeaponDef } from '@/game/combat/weapons'
 import { dayKey } from '@/game/economy/market'
 import { audio } from '@/game/audio/gameAudio'
 import {
@@ -66,7 +80,20 @@ import {
   type FishDef,
 } from '@/game/fishing/fishTable'
 import { clamp } from '@/game/utils/math'
-import type { Catch, MapZone, SeasonId, UnderwaterMode } from '@/types'
+import type { Catch, MapZone, SeasonId, UnderwaterMode, WeaponId } from '@/types'
+
+const DEMON_NAMES = ['墨算心魔', '涂鸦心魔', '三式心魔', '无名算鬼']
+const DEMON_QUIZ_SECONDS = 15
+const DEMON_MAX_ROUNDS = 6
+/** 一口气潜太久，心魔就从深水里浮上来 */
+const DEMON_DWELL_LIMIT = 88
+const EPIPHANY_LINES = [
+  '浪纹里看穿了周天',
+  '一口换气，忽然懂了',
+  '墨点散开，识海透亮',
+  '鱼群绕出的弧线点醒了死结',
+  '水底下那口气通了',
+]
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer
@@ -96,6 +123,7 @@ export class Game {
   readonly sectHalls: SectHalls
   readonly thunder: ThunderLure
   readonly contest: ContestArena
+  readonly demon: InnerDemon
 
   /** 《天雷引》冷却 */
   private thunderCd = 0
@@ -108,6 +136,38 @@ export class Game {
   private contestHudTimer = 0
   private unsubRegister: (() => void) | null = null
   private unsubLeaveContest: (() => void) | null = null
+
+  /** 一次出手的三段：前摇 → 判定帧 → 后摇 */
+  private attackState: { def: WeaponDef; t: number; struck: boolean } | null = null
+  /** 当前这一刀的总时长，动画归一化用 */
+  private attackTotal = 0.28
+  /** 心魔空间里挥刀的空响提示冷却 */
+  private rejectTimer = 0
+  private waterBullets: {
+    mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>
+    velocity: THREE.Vector3
+    damage: number
+    life: number
+    age: number
+  }[] = []
+  /** 天界连续空军的次数，攒满三次唤来心魔 */
+  private demonBlank = 0
+  /** 水下滞留秒数，超过阈值同样有心魔敲门 */
+  private demonDwell = 0
+  private demonIntroT = 0
+  private demonClock = 0
+  private demonHp = 0
+  private demonMaxHp = 0
+  private demonQuiz: QuizDef | null = null
+  private demonAsked: string[] = []
+  private demonRound = 0
+  private demonHudTimer = 0
+  /** 心魔现身那一下的镜头抖动 */
+  private impactShake = 0
+  private epiphanyTimer = 0
+  private unsubDemonAnswer: (() => void) | null = null
+  private unsubDemonDismiss: (() => void) | null = null
+  private unsubFishBlank: (() => void) | null = null
 
   /** 通天河道上的进度 0~1 */
   private ascendT = 0
@@ -141,6 +201,8 @@ export class Game {
   private right = new THREE.Vector3()
   private stern = new THREE.Vector3()
   private viewDir = new THREE.Vector3()
+  private waterBulletDir = new THREE.Vector3()
+  private demonSpot = new THREE.Vector3()
   private auraCenter = new THREE.Vector3()
 
   private swimPos = new THREE.Vector3()
@@ -191,6 +253,16 @@ export class Game {
   private weaponRig = new THREE.Group()
   private knifeModel = new THREE.Group()
   private gunModel = new THREE.Group()
+  private staffModel = new THREE.Group()
+  private greatswordModel = new THREE.Group()
+  private bulletGeo = new THREE.SphereGeometry(0.17, 8, 6)
+  private bulletMat = new THREE.MeshBasicMaterial({
+    color: '#7ed4ff',
+    transparent: true,
+    opacity: 0.88,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
   private muzzle = new THREE.Object3D()
   private muzzleFlash!: THREE.Mesh
   private muzzleLight = new THREE.PointLight('#ffd9a0', 0, 14, 2)
@@ -294,6 +366,7 @@ export class Game {
     this.sectHalls = new SectHalls(this.scene)
     this.thunder = new ThunderLure(this.scene)
     this.contest = new ContestArena(this.scene)
+    this.demon = new InnerDemon(this.scene)
     this.world.setCelestialSurface((x, z, t) => this.celestial.surfaceAt(x, z, t))
     this.celestial.setRimTarget(this.boat.group)
 
@@ -348,6 +421,23 @@ export class Game {
     )
     this.unsubRegister = gameEvents.on('contest:register', () => this.startContest())
     this.unsubLeaveContest = gameEvents.on('contest:leave', () => this.leaveContest())
+    this.unsubFishBlank = gameEvents.on('fish:blank', (event) => {
+      // 心魔专挑丧气的时候进门：天界连续三次空竿就撕开一道口子
+      if (event.zone !== 'celestial') return
+      if (event.blank) {
+        this.demonBlank += 1
+        if (this.demonBlank >= 3) {
+          this.demonBlank = 0
+          this.openDemonSpace('连续三次空竿 · 这点丧气把心魔引来了')
+        }
+      } else {
+        this.demonBlank = 0
+      }
+    })
+    this.unsubDemonAnswer = gameEvents.on('demon:answer', (event) =>
+      this.resolveDemonAnswer(event.value, event.timeout),
+    )
+    this.unsubDemonDismiss = gameEvents.on('demon:dismiss', () => this.finishDemonSpace(false))
     if (saved.mapZone === 'celestial') this.applyZone('celestial', true)
     this.updateCamera(1, true)
     this.updateWeapon(0, saved, false, false)
@@ -421,6 +511,78 @@ export class Game {
     this.muzzleFlash.visible = false
     this.muzzle.add(this.muzzleFlash)
     this.muzzle.add(this.muzzleLight)
+
+    // 鱼骨法杖：一节脊骨当杖身，杖头是三根鱼肋圈出的灵珠
+    const bone = new THREE.MeshStandardMaterial({
+      color: '#e9e2cf',
+      roughness: 0.55,
+      metalness: 0.12,
+      flatShading: true,
+    })
+    const staffShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.62, 6), bone)
+    staffShaft.rotation.x = Math.PI / 2
+    staffShaft.position.z = -0.1
+    const staffSkull = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 5), bone)
+    staffSkull.scale.set(1, 0.82, 1.28)
+    staffSkull.position.z = -0.44
+    this.staffModel.add(staffShaft, staffSkull)
+    for (let i = 0; i < 3; i++) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(0.05 + i * 0.012, 0.008, 4, 9, Math.PI * 1.35), bone)
+      rib.position.z = -0.3 - i * 0.05
+      rib.rotation.z = -0.5
+      this.staffModel.add(rib)
+    }
+    const staffOrb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.042, 8, 6),
+      new THREE.MeshBasicMaterial({
+        color: '#7ed4ff',
+        transparent: true,
+        opacity: 0.92,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    )
+    staffOrb.position.set(0, 0.02, -0.48)
+    this.staffModel.add(staffOrb)
+    this.staffModel.position.set(0.02, 0.01, -0.22)
+    this.staffModel.rotation.set(0.06, -0.06, 0.04)
+    this.weaponRig.add(this.staffModel)
+
+    // 龙牙巨剑：宽背厚刃，剑格上一排龙牙
+    const darkSteel = new THREE.MeshStandardMaterial({
+      color: '#4a3d55',
+      roughness: 0.3,
+      metalness: 0.62,
+      flatShading: true,
+    })
+    const edge = new THREE.MeshStandardMaterial({
+      color: '#e2c8ff',
+      roughness: 0.24,
+      metalness: 0.4,
+      flatShading: true,
+    })
+    const swordGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.036, 0.24, 6), dark)
+    swordGrip.rotation.x = Math.PI / 2
+    swordGrip.position.z = 0.26
+    const swordGuard = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.035, 0.05), gold)
+    swordGuard.position.z = 0.12
+    const swordBody = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.62), darkSteel)
+    swordBody.position.z = -0.22
+    const swordEdge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.032, 0.6), edge)
+    swordEdge.position.set(0.05, 0, -0.22)
+    const swordTip = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.16, 4), darkSteel)
+    swordTip.rotation.x = -Math.PI / 2
+    swordTip.position.z = -0.6
+    this.greatswordModel.add(swordGrip, swordGuard, swordBody, swordEdge, swordTip)
+    for (let i = 0; i < 4; i++) {
+      const fang = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.05, 4), bone)
+      fang.rotation.x = Math.PI / 2
+      fang.position.set(-0.07 + i * 0.046, 0.03, 0.1)
+      this.greatswordModel.add(fang)
+    }
+    this.greatswordModel.position.set(0.02, 0.02, -0.26)
+    this.greatswordModel.rotation.set(0.08, 0.1, -0.12)
+    this.weaponRig.add(this.greatswordModel)
 
     this.camera.add(this.weaponRig)
     this.weaponRig.position.set(0.32, -0.28, -0.62)
@@ -758,7 +920,10 @@ export class Game {
     }
 
     input.update()
+    if (store.demon) this.rejectPhysicalAttacks(store)
     if (modal || locked) input.clearQueued()
+    this.rejectTimer = Math.max(0, this.rejectTimer - dt)
+    this.impactShake = Math.max(0, this.impactShake - dt * 2.4)
 
     if (store.respawnToken !== this.lastRespawnToken) {
       this.lastRespawnToken = store.respawnToken
@@ -913,6 +1078,7 @@ export class Game {
         0.26 + Math.min(0.22, this.boat.speed * 0.035),
       )
     }
+    if (!modal && !locked) this.handleQuickFire(store)
     this.fishing.update(dt, time)
     if (!celestial) {
       this.otter.update(
@@ -956,6 +1122,9 @@ export class Game {
     this.sectHalls.update(time, dt)
     this.contest.ambient(time)
     this.updateContest(dt, time, store)
+    this.demonDwell = 0
+    this.updateDemonSpace(dt, time)
+    this.updateWaterBullets(dt)
     if (this.swordFlight) {
       const alt = this.swordFlightAlt()
       if (alt <= 0) this.setSwordFlight(false)
@@ -1032,6 +1201,7 @@ export class Game {
       if (changed) store.setDragonRace(hud)
     }
 
+    this.updateAttackState(dt)
     this.updateWeapon(dt, store, modal, fishingBusy)
     this.updateSearchlight(store)
     this.updateTrawl(dt, store, time)
@@ -1526,6 +1696,210 @@ export class Game {
     }
   }
 
+  /** 撕开心魔空间：屏幕一闪，手绘小鬼浮到船头 */
+  private openDemonSpace(reason: string) {
+    const store = useGameStore.getState()
+    if (store.demon || this.demon.isActive) return
+    if (this.contest.active || this.gate.isActive || this.crossTimer > 0) return
+    if (this.cultivation.tribulating || store.dead) return
+
+    // 潜太久那一支要把人先捞回水面，心魔空间只在船上进行
+    if (store.underwater) store.setUnderwater(false)
+
+    this.boat.getForward(this.forward)
+    this.right.set(-this.forward.z, 0, this.forward.x)
+    const spot = this.boat.position
+      .clone()
+      .addScaledVector(this.forward, 8.4)
+      .addScaledVector(this.right, 2.6)
+    spot.y = 3.1
+    this.demonMaxHp = 100 + store.realm * 30
+    this.demonHp = this.demonMaxHp
+    this.demonRound = 0
+    this.demonAsked = []
+    this.demonQuiz = null
+    this.demonIntroT = 2.2
+    this.demonClock = DEMON_QUIZ_SECONDS
+    this.demonHudTimer = 0
+    this.impactShake = 1.5
+    this.demonBlank = 0
+    this.demonDwell = 0
+
+    this.fishing.reset()
+    this.seaEvents.cancel()
+    this.setSwordFlight(false)
+    this.clearWaterBullets()
+    this.attackState = null
+    store.setBoss(null)
+    this.demon.summon(spot, 3)
+    store.setDemon({
+      phase: 'intro',
+      bossName: DEMON_NAMES[Math.floor(Math.random() * DEMON_NAMES.length)] ?? '心魔',
+      hp: this.demonHp,
+      maxHp: this.demonMaxHp,
+      quiz: null,
+      round: 0,
+      seconds: DEMON_QUIZ_SECONDS,
+      lastCorrect: false,
+      reward: null,
+    })
+    this.world.flashLightning(1.6)
+    store.flashSky()
+    audio.thunder()
+    store.toast(`${reason} · 心魔从墨色里爬了出来`, 'danger')
+  }
+
+  private updateDemonSpace(dt: number, time: number) {
+    const store = useGameStore.getState()
+    const hud = store.demon
+    const chase = !hud || hud.phase === 'intro' || hud.phase === 'quiz'
+    if (chase) {
+      // 浮在船头前方偏右一点：答题面板占着屏幕下半部，正中间会被完全挡住
+      this.boat.getForward(this.forward)
+      this.right.set(-this.forward.z, 0, this.forward.x)
+      this.demonSpot
+        .copy(this.boat.position)
+        .addScaledVector(this.forward, 8.4)
+        .addScaledVector(this.right, 2.6)
+      this.demonSpot.y = 3.1
+      this.demon.retarget(this.demonSpot, dt)
+    }
+    this.demon.update(dt, time, this.camera, chase)
+    if (!hud) return
+
+    if (hud.phase === 'intro') {
+      this.demonIntroT -= dt
+      if (this.demonIntroT <= 0) this.nextDemonQuiz(false)
+      return
+    }
+    if (hud.phase !== 'quiz') return
+
+    this.demonClock -= dt
+    this.demonHudTimer -= dt
+    if (this.demonHudTimer <= 0) {
+      this.demonHudTimer = 0.2
+      store.setDemon({ ...hud, seconds: Math.max(0, Math.ceil(this.demonClock)) })
+    }
+    if (this.demonClock <= 0) this.resolveDemonAnswer('', true)
+  }
+
+  /** 换下一题：题干进 HUD，倒计时重新上弦 */
+  private nextDemonQuiz(lastCorrect: boolean) {
+    const store = useGameStore.getState()
+    const hud = store.demon
+    if (!hud) return
+    if (this.demonRound >= DEMON_MAX_ROUNDS) {
+      this.finishDemonSpace(false)
+      return
+    }
+    const quiz = randomQuiz(this.demonAsked)
+    this.demonAsked.push(quiz.formula)
+    if (this.demonAsked.length > 6) this.demonAsked = this.demonAsked.slice(-4)
+    this.demonQuiz = quiz
+    this.demonRound += 1
+    this.demonClock = DEMON_QUIZ_SECONDS
+    this.demonHudTimer = 0
+    store.setDemon({
+      ...hud,
+      phase: 'quiz',
+      quiz,
+      round: this.demonRound,
+      seconds: DEMON_QUIZ_SECONDS,
+      lastCorrect,
+    })
+    audio.snap()
+  }
+
+  /** 判题：答对扣 30% 上限真伤，答错/超时吃一轮数学弹幕 */
+  private resolveDemonAnswer(value: string, timeout: boolean) {
+    const store = useGameStore.getState()
+    const hud = store.demon
+    const quiz = this.demonQuiz
+    if (!hud || hud.phase !== 'quiz' || !quiz) return
+
+    const correct = !timeout && isCorrectAnswer(value, quiz)
+    if (correct) {
+      const damage = Math.max(1, Math.round(this.demonMaxHp * 0.3))
+      this.demonHp = Math.max(0, this.demonHp - damage)
+      this.demon.celebrate()
+      audio.caught()
+      if (this.demonHp <= 0) {
+        store.setDemon({ ...hud, hp: 0, maxHp: this.demonMaxHp, lastCorrect: true })
+        this.finishDemonSpace(true)
+        return
+      }
+      store.setDemon({
+        ...hud,
+        hp: this.demonHp,
+        maxHp: this.demonMaxHp,
+        lastCorrect: true,
+        quiz: null,
+      })
+      this.nextDemonQuiz(true)
+      return
+    }
+
+    this.demon.hurt(0.6)
+    this.demon.fireBarrage(this.boat.position, 6 + this.demonRound * 2, 9)
+    audio.thunder()
+    const hurt = Math.round(8 + this.demonRound * 4 + store.realm * 2)
+    store.damagePlayer(hurt, timeout ? '答不上来 · 心魔的符号雨' : '答错了 · 心魔的符号雨')
+    if (store.dead || useGameStore.getState().dead) {
+      this.finishDemonSpace(false)
+      return
+    }
+    store.setDemon({ ...hud, hp: this.demonHp, maxHp: this.demonMaxHp, lastCorrect: false, quiz: null })
+    this.nextDemonQuiz(false)
+  }
+
+  /** 结算：赢了吐一枚心魔内丹，输了只当被吓掉一层皮 */
+  private finishDemonSpace(won: boolean) {
+    const store = useGameStore.getState()
+    const hud = store.demon
+    if (!hud) return
+    if (hud.phase === 'win' || hud.phase === 'lose') {
+      this.leaveDemonSpace()
+      return
+    }
+    let reward: string | null = null
+    if (won) {
+      const xp = 160 + store.realm * 120
+      store.absorbCore('心魔内丹 · 涂鸦化去', xp)
+      reward = `心魔散作墨点 · 修为 +${xp}`
+      store.toast('心魔散了 · 一枚内丹落在船板上', 'gold')
+      gameEvents.emit('demon:win', { rounds: this.demonRound })
+    } else {
+      reward = '心魔未除 · 墨点还粘在船舷上'
+      store.toast('你退出心魔空间 · 心魔还在等你答题', 'info')
+      gameEvents.emit('demon:loss', {})
+    }
+    this.demon.dismiss(0.8)
+    store.setDemon({
+      ...hud,
+      phase: won ? 'win' : 'lose',
+      hp: this.demonHp,
+      maxHp: this.demonMaxHp,
+      quiz: null,
+      reward,
+    })
+  }
+
+  /** 结算界面点「离开」：光幕收掉，日子照旧 */
+  private leaveDemonSpace() {
+    const store = useGameStore.getState()
+    this.demon.dismiss(0.5)
+    this.clearWaterBullets()
+    store.setDemon(null)
+    this.demonQuiz = null
+    this.demonAsked = []
+    this.demonRound = 0
+    this.demonBlank = 0
+    this.demonDwell = 0
+    this.updateCamera(1, true)
+    if (!store.dead) store.healPlayer(Math.round(maxHpFor(store.realm) * 0.2))
+    store.toast('墨色退去 · 海面重新亮起来', 'info')
+  }
+
   private onCelestialSummon(x: number, z: number) {
     const store = useGameStore.getState()
     this.boat.getForward(this.forward)
@@ -1560,6 +1934,29 @@ export class Game {
     player.underwater = store.underwater
     player.busy = modal || store.dead || store.inputLocked || fishingBusy
     this.cultivation.update(dt, time, player)
+    this.rollEpiphany(dt, store, modal, fishingBusy)
+  }
+
+  /** 顿悟：潜水和守竿时每隔二十秒掷一次，概率极低，一次给掉小半截境界 */
+  private rollEpiphany(
+    dt: number,
+    store: ReturnType<typeof useGameStore.getState>,
+    modal: boolean,
+    fishingBusy: boolean,
+  ) {
+    if (modal || store.dead || store.demon || this.contest.active) return
+    this.epiphanyTimer += dt
+    if (this.epiphanyTimer < 20) return
+    this.epiphanyTimer = 0
+    const focused = store.underwater || fishingBusy
+    if (!focused || Math.random() > 0.03) return
+    const xp = epiphanyXp(store.realm)
+    store.gainCultivation(xp, '顿悟')
+    store.showEpiphany(
+      EPIPHANY_LINES[Math.floor(Math.random() * EPIPHANY_LINES.length)] ?? '心头一亮',
+      xp,
+    )
+    audio.caught()
   }
 
   private enterUnderwater() {
@@ -1622,6 +2019,16 @@ export class Game {
     modal: boolean,
   ) {
     const locked = store.inputLocked
+    if (!locked && !modal) {
+      this.demonDwell += dt
+      if (this.demonDwell >= DEMON_DWELL_LIMIT) {
+        this.demonDwell = 0
+        this.openDemonSpace('在水下憋得太久 · 眼前一黑')
+        return
+      }
+    } else {
+      this.demonDwell = 0
+    }
     this.boat.update(dt, time, this.world, 0, 0, false)
     this.boat.setNight(
       SEASONS[store.season].period === 'night' || this.world.stormStrength > 0.45,
@@ -1711,6 +2118,8 @@ export class Game {
         dead: store.dead,
       })
     }
+    this.updateAttackState(dt)
+    this.updateWaterBullets(dt)
     this.updateWeapon(dt, store, modal, false)
     this.updateSearchlight(store)
     this.updateTrawl(dt, store, time)
@@ -1915,7 +2324,7 @@ export class Game {
     }
 
     this.camera.position.copy(this.camPos)
-    const shake = this.cultivation.cameraShake
+    const shake = Math.max(this.cultivation.cameraShake, this.impactShake)
     if (shake > 0.001) {
       this.camera.position.x += (Math.random() - 0.5) * shake * 0.9
       this.camera.position.y += (Math.random() - 0.5) * shake * 0.62
@@ -2108,6 +2517,15 @@ export class Game {
     this.swimVel.set(0, 0, 0)
     this.captureFish = null
     this.captureCooldown = 0
+    this.clearWaterBullets()
+    this.attackState = null
+    // 死一次就把心魔空间清账，免得复活后还困在墨色里
+    this.demon.dismiss(0.2)
+    this.demonBlank = 0
+    this.demonDwell = 0
+    this.demonRound = 0
+    this.demonQuiz = null
+    useGameStore.getState().setDemon(null)
     this.updateCamera(1, true)
     this.camPos.copy(this.camera.position)
     this.camera.getWorldDirection(this.viewDir)
@@ -2155,9 +2573,12 @@ export class Game {
     this.weaponRig.visible = active && !thirdPerson
     if (!active || thirdPerson) return
 
-    const isGun = store.equippedWeapon === 'speargun'
-    this.knifeModel.visible = !isGun
-    this.gunModel.visible = isGun
+    const def = weaponById(store.equippedWeapon) ?? weaponById('knife')
+    const windupFrac = def ? def.windup / Math.max(0.01, def.windup + def.recover) : 0.35
+    this.knifeModel.visible = def?.id === 'knife'
+    this.gunModel.visible = def?.id === 'speargun'
+    this.staffModel.visible = def?.id === 'bonestaff'
+    this.greatswordModel.visible = def?.id === 'dragonblade'
 
     const raise = this.switchAnim > 0 ? 1 - this.switchAnim / 0.3 : 1
     const bob = Math.sin(this.elapsed * 1.9) * 0.007 + Math.sin(this.elapsed * 4.3) * 0.003
@@ -2167,15 +2588,131 @@ export class Game {
       -0.28 + bob - (1 - Math.min(1, raise * 1.8)) * 0.24,
       -0.62,
     )
-    const recoil = this.attackAnim > 0 ? Math.sin((1 - this.attackAnim / 0.28) * Math.PI) : 0
-    if (isGun) {
-      this.gunModel.position.z = -0.2 + recoil * 0.07
-      this.gunModel.rotation.x = 0.02 + recoil * 0.16
-    } else {
-      this.knifeModel.rotation.z = -0.16 - recoil * 0.75
-      this.knifeModel.rotation.y = 0.12 + recoil * 0.35
-      this.knifeModel.position.z = -0.12 - recoil * 0.16
+    const swing = this.swingPhase(windupFrac)
+    switch (def?.id) {
+      case 'speargun':
+        this.gunModel.position.z = -0.2 + Math.max(0, swing) * 0.07
+        this.gunModel.rotation.x = 0.02 + Math.max(0, swing) * 0.16
+        break
+      case 'bonestaff':
+        // 法杖出手轻：前摇把杖头压回来，判定帧往前一点点的抖
+        this.staffModel.position.z = -0.22 + swing * 0.06
+        this.staffModel.rotation.x = 0.06 - swing * 0.2
+        break
+      case 'dragonblade':
+        // 巨剑：前摇整个抬过头顶，落下去时杖身压得镜头都沉
+        this.greatswordModel.rotation.z = -0.12 - swing * 1.5
+        this.greatswordModel.rotation.x = 0.08 - swing * 0.7
+        this.greatswordModel.position.z = -0.26 - Math.max(0, swing) * 0.22
+        this.weaponRig.position.y -= Math.abs(swing) * 0.06
+        break
+      default:
+        this.knifeModel.rotation.z = -0.16 - swing * 0.75
+        this.knifeModel.rotation.y = 0.12 + swing * 0.35
+        this.knifeModel.position.z = -0.12 - swing * 0.16
     }
+  }
+
+  /** 把 attackAnim 折成 -0.5（蓄力）→ 1（判定帧）→ 0（收招）的一根曲线 */
+  private swingPhase(windupFrac: number) {
+    if (this.attackAnim <= 0) return 0
+    const k = 1 - this.attackAnim / Math.max(0.01, this.attackTotal)
+    if (k < windupFrac) return -(k / Math.max(0.001, windupFrac)) * 0.5
+    const p = (k - windupFrac) / Math.max(0.001, 1 - windupFrac)
+    if (p < 0.3) return -0.5 + (p / 0.3) * 1.5
+    return 1 - (p - 0.3) / 0.7
+  }
+
+  /** 前摇走完的那一帧才真的造成伤害 */
+  private updateAttackState(dt: number) {
+    const state = this.attackState
+    if (!state) return
+    state.t += dt
+    if (!state.struck && state.t >= state.def.windup) {
+      state.struck = true
+      if (state.def.kind === 'melee') this.strikeMelee(state.def)
+      else this.strikeRanged(state.def)
+    }
+    if (state.t >= state.def.windup + state.def.recover) this.attackState = null
+  }
+
+  /** 水弹是一颗会飞的球，一路穿过去谁被蹭到谁倒霉 */
+  private updateWaterBullets(dt: number) {
+    if (!this.waterBullets.length) return
+    const store = useGameStore.getState()
+    for (let i = this.waterBullets.length - 1; i >= 0; i--) {
+      const bullet = this.waterBullets[i]
+      bullet.age += dt
+      const step = Math.min(dt, Math.max(0, bullet.life - bullet.age))
+      bullet.mesh.position.addScaledVector(bullet.velocity, step)
+      bullet.mesh.rotation.y += dt * 7
+      bullet.mesh.scale.setScalar(1 + Math.sin(bullet.age * 22) * 0.12)
+
+      this.waterBulletDir.copy(bullet.velocity).normalize()
+      const hit = this.creatures.rayHit(
+        bullet.mesh.position,
+        this.waterBulletDir,
+        1.6,
+        bullet.damage,
+      )
+      const mirror = this.contest.active ? this.contest.opponentPosition : null
+      const brushedMirror = Boolean(mirror && bullet.mesh.position.distanceTo(mirror) < 1.8)
+      // 心魔空间里物理攻击一律无效，水弹穿过去什么也打不到
+      const brushedDemon = Boolean(
+        !store.demon && this.demon.isActive && bullet.mesh.position.distanceTo(this.demon.headPosition) < 2.2,
+      )
+      if (hit || brushedMirror || brushedDemon) {
+        if (brushedMirror && this.contest.strike(bullet.mesh.position, 1.8, bullet.damage)) {
+          this.contestFeedback()
+        }
+        if (brushedDemon) this.rejectPhysicalAttacks(store)
+        this.seaEvents.strike(bullet.mesh.position, this.waterBulletDir, 1.6, bullet.damage)
+        this.bulletBurst(bullet.mesh.position, 0.9)
+        this.removeBullet(i)
+        continue
+      }
+      if (bullet.age >= bullet.life || bullet.mesh.position.y < -2.5) {
+        this.bulletBurst(bullet.mesh.position, 0.5)
+        this.removeBullet(i)
+      }
+    }
+  }
+
+  private bulletBurst(at: THREE.Vector3, strength: number) {
+    this.world.foam.splash(at.x, at.z, 3 + strength * 3, 0.5 + strength * 0.5)
+    if (strength > 0.7) audio.splash(0.32)
+    else audio.splash(0.18)
+  }
+
+  private removeBullet(index: number) {
+    const bullet = this.waterBullets[index]
+    if (!bullet) return
+    this.scene.remove(bullet.mesh)
+    bullet.mesh.material.dispose()
+    this.waterBullets.splice(index, 1)
+  }
+
+  /** 换场景/心魔空间/死亡：飞在半路的水弹一律收回 */
+  private clearWaterBullets() {
+    while (this.waterBullets.length) this.removeBullet(this.waterBullets.length - 1)
+  }
+
+  /** 心魔空间里掏武器：只溅墨花，不掉血 */
+  private rejectPhysicalAttacks(store: ReturnType<typeof useGameStore.getState>) {
+    const hud = store.demon
+    if (!hud || hud.phase === 'win' || hud.phase === 'lose') return
+    const swung =
+      input.consumeKnife() ||
+      input.consumeGun() ||
+      input.consumeSkillWater() ||
+      input.consumeSkillSword() ||
+      input.consumeThunder()
+    if (!swung) return
+    this.demon.hurt(0.25)
+    audio.snap()
+    if (this.rejectTimer > 0) return
+    this.rejectTimer = 2.4
+    store.toast('刀剑穿墨影 · 心魔不吃这一套，答题', 'danger')
   }
 
   private updateSearchlight(store: ReturnType<typeof useGameStore.getState>) {
@@ -2366,8 +2903,8 @@ export class Game {
   ) {
     if (modal) return
 
-    if (input.consumeKnife()) this.attackMelee()
-    if (input.consumeGun()) this.attackRanged()
+    if (input.consumeKnife()) this.beginAttack('melee')
+    if (input.consumeGun()) this.beginAttack('ranged')
 
     if (input.consumeSkillWater()) this.cultivation.castWater(this.cultPlayer)
     if (input.consumeSkillSword()) this.cultivation.castSword(this.cultPlayer)
@@ -2394,6 +2931,9 @@ export class Game {
     if (input.consumeGrill()) {
       if (store.underwater) {
         store.toast('浮回水面再开烤架', 'info')
+      } else if ((store.pantry[DRIED_FISH_KEY] ?? 0) > 0) {
+        // 有鱼干先吃鱼干，满血时不吃，免得浪费
+        if (!store.eatDriedFish()) store.grillCatch()
       } else {
         store.grillCatch()
       }
@@ -2467,18 +3007,55 @@ export class Game {
     store.toast(`${label} · 生命 +${healed}`, 'gold')
   }
 
-  private attackMelee() {
+  /** J / K / 左键都从这里出手：先声张，前摇走完才算打到 */
+  private beginAttack(kind: 'melee' | 'ranged') {
     const store = useGameStore.getState()
-    const def = weaponById('knife')
-    if (!def || store.dead || this.weaponCooldown > 0) return
-    if (!store.ownedWeapons.includes('knife')) {
-      store.toast('还没有渔刀，去渔具铺买一把', 'info')
+    if (store.dead || this.weaponCooldown > 0 || this.attackState) return
+    if (store.demon) return
+    const def = this.weaponOfKind(store, kind)
+    if (!def) {
+      store.toast(kind === 'melee' ? '还没有趁手的近战兵器' : '还没有远程兵器', 'info')
       return
     }
-    if (store.equippedWeapon !== 'knife') store.equipWeapon('knife')
+    if (def.ammoMax > 0 && !store.consumeAmmo(def.id)) return
+    if (store.equippedWeapon !== def.id) store.equipWeapon(def.id)
+    this.attackTotal = def.windup + def.recover
+    this.attackAnim = this.attackTotal
     this.weaponCooldown = def.cooldown
-    this.attackAnim = 0.28
+    this.attackState = { def, t: 0, struck: false }
     this.avatar.slash()
+  }
+
+  /** 手里有这件武器就用它：装备栏对不上就顺手换上 */
+  private weaponOfKind(
+    store: ReturnType<typeof useGameStore.getState>,
+    kind: 'melee' | 'ranged',
+  ): WeaponDef | null {
+    const equipped = weaponById(store.equippedWeapon)
+    if (equipped && equipped.kind === kind && store.ownedWeapons.includes(equipped.id)) {
+      return equipped
+    }
+    const owned = WEAPONS.filter((w) => w.kind === kind && store.ownedWeapons.includes(w.id))
+    if (!owned.length) return null
+    return owned.reduce((best, w) => (w.damage > best.damage ? w : best), owned[0])
+  }
+
+  /** 快捷开火：左键本来要蓄力抛竿，只有锁定到敌人时才被武器截走 */
+  private handleQuickFire(store: ReturnType<typeof useGameStore.getState>) {
+    if (!input.consumeFire()) return
+    if (store.underwater || store.dead || store.demon) return
+    const def = weaponById(store.equippedWeapon)
+    if (!def || !store.ownedWeapons.includes(def.id)) return
+    const hostile =
+      Boolean(store.boss) || this.contest.active || this.combatHasTarget || def.id === 'bonestaff'
+    if (!hostile) return
+    if (this.weaponCooldown > 0 || this.attackState) return
+    this.beginAttack(def.kind)
+    input.cancelActionPress()
+  }
+
+  private strikeMelee(def: WeaponDef) {
+    const store = useGameStore.getState()
     this.camera.getWorldDirection(this.viewDir)
     const isOnBoat = !store.underwater
     const origin = isOnBoat ? this.boat.position.clone() : this.camera.position.clone()
@@ -2502,7 +3079,7 @@ export class Game {
     )
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
     this.seaEvents.strike(origin, this.viewDir, range, damage)
-    if (hits) this.applyLeech(damage * faction.lifesteal, '渔刀饮血')
+    if (hits) this.applyLeech(damage * faction.lifesteal, `${def.name}饮血`)
     if (this.contest.strike(origin, range, damage, this.viewDir)) {
       this.applyLeech(damage * faction.lifesteal, '一刀斩向心魔')
       this.contestFeedback()
@@ -2511,22 +3088,18 @@ export class Game {
       const fish = this.findBoatFish(range, 0.1)
       if (fish) this.catchSurfaceFish(fish, 0.62)
     }
-    audio.snap()
+    if (def.id === 'dragonblade') {
+      // 一剑劈下去船都得沉半尺
+      this.world.foam.splash(origin.x, origin.z, 7, 1.1)
+      audio.thunder()
+      if (hits) this.impactShake = Math.max(this.impactShake, 0.34)
+    } else {
+      audio.snap()
+    }
   }
 
-  private attackRanged() {
+  private strikeRanged(def: WeaponDef) {
     const store = useGameStore.getState()
-    const def = weaponById('speargun')
-    if (!def || store.dead || this.weaponCooldown > 0) return
-    if (!store.ownedWeapons.includes('speargun')) {
-      store.toast('还没有鱼枪，去渔具铺买一把', 'info')
-      return
-    }
-    if (store.equippedWeapon !== 'speargun') store.equipWeapon('speargun')
-    if (!store.consumeAmmo('speargun')) return
-    this.weaponCooldown = def.cooldown
-    this.attackAnim = 0.28
-    this.avatar.slash()
     this.camera.getWorldDirection(this.viewDir)
     const isOnBoat = !store.underwater
     const origin = this.camera.position.clone()
@@ -2540,6 +3113,10 @@ export class Game {
     const damage = Math.round(
       def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm) * faction.attackMul,
     )
+    if (def.id === 'bonestaff') {
+      this.spitWaterBullet(def, origin, this.viewDir, damage)
+      return
+    }
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
     const pierced = this.contest.strike(origin, def.range, damage, this.viewDir)
@@ -2574,6 +3151,28 @@ export class Game {
     const end = origin.addScaledVector(this.viewDir, def.range)
     this.flashMuzzle(end)
     audio.snap()
+  }
+
+  /** 法杖吐出的水弹会一路飞，命中谁看它自己 */
+  private spitWaterBullet(
+    def: WeaponDef,
+    origin: THREE.Vector3,
+    dir: THREE.Vector3,
+    damage: number,
+  ) {
+    const mesh = new THREE.Mesh(this.bulletGeo, this.bulletMat.clone())
+    mesh.position.copy(origin).addScaledVector(dir, 1.1)
+    mesh.position.y -= 0.12
+    mesh.renderOrder = 7
+    this.scene.add(mesh)
+    this.waterBullets.push({
+      mesh,
+      velocity: dir.clone().multiplyScalar(30),
+      damage,
+      life: def.range / 30,
+      age: 0,
+    })
+    audio.splash(0.34)
   }
 
   private flashMuzzle(end: THREE.Vector3) {
@@ -2617,13 +3216,38 @@ export class Game {
     material.opacity = 0.9 * Math.min(1, this.ropeT / 0.2)
   }
 
+  /** 船上 1/2 各管一类兵器，反复按在本类里轮换；3 循环捕捞工具 */
+  private cycleWeaponSlot(store: ReturnType<typeof useGameStore.getState>, slot: 1 | 2) {
+    const kind: 'melee' | 'ranged' = slot === 1 ? 'melee' : 'ranged'
+    const owned = WEAPONS.filter((w) => w.kind === kind && store.ownedWeapons.includes(w.id))
+    if (!owned.length) {
+      store.toast(
+        kind === 'melee' ? '近战兵器一件都没有，先去渔具铺' : '远程兵器一件都没有，先去渔具铺',
+        'info',
+      )
+      return
+    }
+    const equipped = weaponById(store.equippedWeapon)
+    const at =
+      equipped && equipped.kind === kind ? owned.findIndex((w) => w.id === equipped.id) : -1
+    const next = owned[at + 1 >= owned.length ? 0 : at + 1]
+    if (store.equippedWeapon !== next.id) store.equipWeapon(next.id)
+    store.toast(`换到${next.name}`, 'info')
+  }
+
+  private cycleCaptureTool(store: ReturnType<typeof useGameStore.getState>) {
+    const at = CAPTURE_TOOLS.findIndex((t) => t.id === store.activeTool)
+    const next = CAPTURE_TOOLS[(at + 1) % CAPTURE_TOOLS.length]
+    store.setActiveTool(next.id)
+    store.toast(`拿出${next.name}`, 'info')
+  }
+
   private handleActions(store: ReturnType<typeof useGameStore.getState>, modal: boolean) {
     if (modal) return
 
     const slot = input.consumeSlot()
-    if (slot && CAPTURE_TOOLS[slot - 1]) {
-      store.setActiveTool(CAPTURE_TOOLS[slot - 1].id)
-    }
+    if (slot === 1 || slot === 2) this.cycleWeaponSlot(store, slot)
+    else if (slot === 3) this.cycleCaptureTool(store)
 
     if (input.consumeTown()) {
       if (this.fishing.phase === 'idle') {
@@ -3156,6 +3780,9 @@ export class Game {
       })
     }
     this.trapMeshes.clear()
+    this.clearWaterBullets()
+    this.bulletGeo.dispose()
+    this.bulletMat.dispose()
     this.rope.geometry.dispose()
     ;(this.rope.material as THREE.Material).dispose()
     this.creatures.dispose()
@@ -3171,10 +3798,14 @@ export class Game {
     this.unsubSummon?.()
     this.unsubRegister?.()
     this.unsubLeaveContest?.()
+    this.unsubFishBlank?.()
+    this.unsubDemonAnswer?.()
+    this.unsubDemonDismiss?.()
     this.celestial.dispose()
     this.sectHalls.dispose()
     this.thunder.dispose()
     this.contest.dispose()
+    this.demon.dispose()
     this.gate.dispose()
     this.achievements.dispose()
     this.post.dispose()

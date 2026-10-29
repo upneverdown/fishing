@@ -1,16 +1,18 @@
-import { Backpack, BookOpen, Coins, Fish, Lock, PackageOpen, Scale, X } from 'lucide-react'
+import { Backpack, BookOpen, Coins, Fish, Lock, PackageOpen, Scale, Sun, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { FishArt } from '@/components/FishArt'
 import { FISH, RARITIES } from '@/game/fishing/fishTable'
-import { bagCapacity, useGameStore } from '@/store/useGameStore'
+import { DRIED_FISH_KEY, bagCapacity, useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
 
 export function BagDialog() {
   const open = useGameStore((s) => s.bagOpen)
   const setBagOpen = useGameStore((s) => s.setBagOpen)
   const bag = useGameStore((s) => s.bag)
+  const dried = useGameStore((s) => s.pantry[DRIED_FISH_KEY] ?? 0)
+  const dryFish = useGameStore((s) => s.dryFish)
   const capacity = useGameStore((s) => bagCapacity(s))
   const caughtLog = useGameStore((s) => s.caughtLog)
   const bestKg = useGameStore((s) => s.bestKg)
@@ -18,6 +20,7 @@ export function BagDialog() {
   const money = useGameStore((s) => s.money)
 
   const totalValue = bag.reduce((sum, c) => sum + c.value, 0)
+  const dryCount = bag.filter((c) => !c.junk).length
   const collected = FISH.filter((f) => (caughtLog[f.id] ?? 0) > 0).length
   const progress = (collected / FISH.length) * 100
 
@@ -139,9 +142,29 @@ export function BagDialog() {
                 </div>
               )}
             </div>
-            <div className="mt-2 flex items-center justify-between rounded-md bg-foam/4 px-2.5 py-1.5 text-[10px] text-muted-foreground">
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-foam/4 px-2.5 py-1.5 text-[10px] text-muted-foreground">
               <span>卖鱼请靠近老码头，按 E 或点「卖鱼」</span>
-              <span className="tnum text-gold/80">共 ¥{totalValue}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="tnum text-gold/80">共 ¥{totalValue}</span>
+                <button
+                  type="button"
+                  onClick={() => dryFish()}
+                  disabled={dryCount === 0}
+                  className={cn(
+                    'flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors',
+                    dryCount > 0
+                      ? 'border-gold/45 bg-gold/10 text-gold hover:bg-gold/20'
+                      : 'border-border/30 text-foam/25',
+                  )}
+                >
+                  <Sun className="size-3" />
+                  晒成鱼干
+                </button>
+                <span className="tnum flex items-center gap-1 text-[10px] text-foam/55">
+                  <Fish className="size-3" />
+                  {dried}
+                </span>
+              </div>
             </div>
           </TabsContent>
 

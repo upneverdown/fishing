@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Anchor, Check, Coins, Users, X } from 'lucide-react'
-import { CREW, crewById } from '@/game/crew/crew'
-import { useGameStore } from '@/store/useGameStore'
+import { CREW, CREW_AFFINITY_MAX, crewById } from '@/game/crew/crew'
+import { DRIED_FISH_KEY, useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
 
 export function CrewPanel() {
@@ -11,6 +11,9 @@ export function CrewPanel() {
   const crew = useGameStore((s) => s.crew)
   const money = useGameStore((s) => s.money)
   const hireCrew = useGameStore((s) => s.hireCrew)
+  const affinityOf = useGameStore((s) => s.crewAffinity)
+  const dried = useGameStore((s) => s.pantry[DRIED_FISH_KEY] ?? 0)
+  const feedCrewDriedFish = useGameStore((s) => s.feedCrewDriedFish)
 
   useEffect(() => {
     if (!open) return
@@ -98,6 +101,7 @@ export function CrewPanel() {
             {CREW.map((def) => {
               const hired = crew.includes(def.id)
               const affordable = money >= def.cost
+              const affinity = Math.round(affinityOf[def.id] ?? 0)
               return (
                 <div
                   key={def.id}
@@ -165,6 +169,35 @@ export function CrewPanel() {
                       )}
                     </button>
                   </div>
+                  {hired && (
+                    <div className="relative mt-1.5 flex items-center gap-2 rounded-lg bg-black/22 px-2 py-1.5">
+                      <span className="shrink-0 text-[9px] tracking-[0.12em] text-foam/40">
+                        默契
+                      </span>
+                      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-foam/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-tide to-gold transition-[width] duration-300"
+                          style={{ width: `${(affinity / CREW_AFFINITY_MAX) * 100}%` }}
+                        />
+                      </div>
+                      <span className="tnum shrink-0 text-[9px] text-gold/80">
+                        {affinity}/{CREW_AFFINITY_MAX}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => feedCrewDriedFish(def.id)}
+                        disabled={dried === 0 || affinity >= CREW_AFFINITY_MAX}
+                        className={cn(
+                          'shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold transition-colors',
+                          dried > 0 && affinity < CREW_AFFINITY_MAX
+                            ? 'bg-gold/15 text-gold hover:bg-gold/25'
+                            : 'bg-white/5 text-foam/25',
+                        )}
+                      >
+                        {affinity >= CREW_AFFINITY_MAX ? '默契无间' : `喂鱼干 (${dried})`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -176,7 +209,7 @@ export function CrewPanel() {
         </div>
 
         <footer className="relative border-t border-white/8 px-4 py-2 text-center text-[8px] tracking-[0.18em] text-foam/22">
-          按 K 或 ESC 关闭
+          按 M 或 ESC 关闭
         </footer>
       </motion.section>
     </div>

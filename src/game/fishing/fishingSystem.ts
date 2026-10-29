@@ -616,6 +616,11 @@ export class FishingSystem {
 
   reset() {
     const store = useGameStore.getState()
+    // 空竿记录：线真正下过水、最后却没带东西回来
+    if (this.phase === 'waiting' || this.phase === 'bite' || this.phase === 'fight' || this.phase === 'landed') {
+      const blank = this.phase !== 'landed' && !this.landedCatch
+      gameEvents.emit('fish:blank', { blank, zone: store.mapZone })
+    }
     this.phase = 'idle'
     this.bobber.setVisible(false)
     this.line.visible = false

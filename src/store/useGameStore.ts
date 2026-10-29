@@ -117,7 +117,8 @@ import {
   type AchievementMap,
   type AchievementProgress,
 } from '@/game/achievements/catalog'
-import { CREW, crewById } from '@/game/crew/crew'
+import { CREW, CREW_AFFINITY_MAX, crewById } from '@/game/crew/crew'
+import type { QuizDef } from '@/game/demon/quizBank'
 import {
   PLAYER_SKINS,
   isPlayerSkin,
@@ -158,6 +159,10 @@ export const UNDERWATER_MODE_LABEL: Record<UnderwaterMode, string> = {
   orbit: '环绕船身',
 }
 const SAVE_KEY = 'tidewater-save-v1'
+/** 鱼干直接借用餐库储物格，省去一个新存档字段 */
+export const DRIED_FISH_KEY = 'fish:dried'
+export const DRIED_FISH_HEAL_RATIO = 0.3
+export const DRIED_FISH_COOLDOWN_MS = 10_000
 const CABIN_COSTS = [0, 650, 1800]
 const CODEX_MILESTONES = [25, 50, 75, 100] as const
 const CODEX_REWARDS: Record<number, number> = { 25: 120, 50: 320, 75: 760, 100: 1800 }
@@ -254,6 +259,32 @@ export interface ContestHud {
   reward: string | null
 }
 
+export type DemonPhase = 'intro' | 'quiz' | 'win' | 'lose'
+
+/** 心魔空间：答题战斗的界面状态，纯运行时，不落存档 */
+export interface DemonHud {
+  phase: DemonPhase
+  bossName: string
+  /** 小鬼血量按 30% 上限一格一格扣 */
+  hp: number
+  maxHp: number
+  quiz: QuizDef | null
+  /** 第几题，决定弹幕密度 */
+  round: number
+  /** 本题剩余秒数 */
+  seconds: number
+  lastCorrect: boolean
+  /** 收尾说明（胜利时的战利品） */
+  reward: string | null
+}
+
+/** 顿悟飘字 */
+export interface EpiphanyNotice {
+  id: number
+  text: string
+  xp: number
+}
+
 /** 空白的功法表：新档与读档兜底共用 */
 export function emptyTechniques(): Record<TechniqueId, number> {
   return { taigong: 0, thunderlure: 0, swordflight: 0, starabsorb: 0 }
@@ -326,6 +357,8 @@ interface PersistedProgress {
   /** 宗门大比战绩 */
   contestWins: number
   contestLosses: number
+  /** 船员好感：喂鱼干涨，直接影响其产出效率 */
+  crewAffinity: Record<string, number>
 }
 
 interface GameStore extends PersistedProgress {
@@ -384,6 +417,12 @@ interface GameStore extends PersistedProgress {
   /** 非空即宗门大殿面板已打开，值决定是哪一座山门 */
   sectAt: FactionId | null
   contest: ContestHud | null
+  /** 非空即心魔空间已展开，答题战斗中 */
+  demon: DemonHud | null
+  /** 顿悟飘字，几秒后自动清除 */
+  epiphany: EpiphanyNotice | null
+  /** 上一次吃鱼干的时刻，10 秒冷却 */
+  driedFishAt: number
 
   setStarted: (started: boolean) => void
   setPhase: (phase: FishingPhase) => void
@@ -516,6 +555,12 @@ interface GameStore extends PersistedProgress {
   upgradeTechnique: (id: TechniqueId) => boolean
   toggleTechnique: (id: TechniqueId) => boolean
   setContest: (hud: ContestHud | null) => void
+  setDemon: (demon: DemonHud | null) => void
+  showEpiphany: (text: string, xp: number) => void
+  dryFish: (count?: number) => number
+  eatDriedFish: () => boolean
+  feedPetDriedFish: () => boolean
+  feedCrewDriedFish: (id: string) => boolean
   recordContestResult: (won: boolean, opponent: string) => void
   toast: (text: string, tone?: ToastItem['tone']) => void
   dismissToast: (id: number) => void
@@ -648,6 +693,13 @@ function readSave(): Partial<PersistedProgress> {
       }
       out.gatherCooldowns = map
     }
+    if (isObj(p.crewAffinity)) {
+      const map: Record<string, number> = {}
+      for (const [k, v] of Object.entries(p.crewAffinity)) {
+        if (typeof v === 'number' && v > 0) map[k] = Math.min(CREW_AFFINITY_MAX, Math.round(v))
+      }
+      out.crewAffinity = map
+    }
     if (isObj(p.stats)) out.stats = p.stats as unknown as StoreStats
     if (typeof p.hp === 'number') out.hp = p.hp
     if (Array.isArray(p.ownedWeapons)) {
@@ -655,7 +707,7 @@ function readSave(): Partial<PersistedProgress> {
     }
     if (isWeaponId(p.equippedWeapon)) out.equippedWeapon = p.equippedWeapon
     if (isObj(p.weaponAmmo)) {
-      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6 }
+      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0 }
       for (const weapon of WEAPONS) {
         ammo[weapon.id] = Math.max(0, Math.round(num(p.weaponAmmo[weapon.id], weapon.ammoMax)))
       }
@@ -885,6 +937,7 @@ function sanitizeStats(raw: StoreStats | undefined): StoreStats {
 
 let toastSeq = 0
 let achievementSeq = 0
+let epiphanySeq = 0
 let achievementPersistAt = 0
 
 export const useGameStore = create<GameStore>()((set, get) => {
@@ -926,6 +979,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       ? { day: today, value: Math.max(0, num(saved.dailySold.value, 0)) }
       : { day: today, value: 0 }
   const gatherCooldowns = saved.gatherCooldowns ?? {}
+  const crewAffinity = saved.crewAffinity ?? {}
   const stats = sanitizeStats(saved.stats)
   const initialCabin = Math.round(clamp(num(saved.cabinLevel, 1), 1, 3))
   const trophies = (saved.trophies ?? []).filter((id) => Boolean(fishById(id)))
@@ -941,7 +995,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     saved.equippedWeapon && ownedWeapons.includes(saved.equippedWeapon)
       ? saved.equippedWeapon
       : 'knife'
-  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6 }
+  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0 }
   const ownedFacilities = saved.ownedFacilities ?? []
   const installedFacilities = sanitizeInstalled(saved.installedFacilities, initialBoat)
   const facilityActive = saved.facilityActive ?? {}
@@ -987,6 +1041,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
       traps,
       dailySold,
       gatherCooldowns,
+      crewAffinity,
       stats,
       hp,
       ownedWeapons,
@@ -1050,6 +1105,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           traps,
           dailySold,
           gatherCooldowns,
+          crewAffinity,
           stats,
           hp,
           ownedWeapons,
@@ -1143,6 +1199,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     traps,
     dailySold,
     gatherCooldowns,
+    crewAffinity,
     stats,
     hp: initialHp,
     ownedWeapons,
@@ -1228,6 +1285,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     factionChoiceOpen: false,
     sectAt: null,
     contest: null,
+    demon: null,
+    epiphany: null,
+    driedFishAt: 0,
 
     setStarted: (started) => set({ started }),
     setPhase: (phase) => set({ phase }),
@@ -2912,6 +2972,130 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
     setContest: (contest) => set({ contest }),
 
+    setDemon: (demon) => set({ demon }),
+
+    showEpiphany: (text, xp) => {
+      epiphanySeq += 1
+      const id = epiphanySeq
+      set({ epiphany: { id, text, xp: Math.max(0, Math.round(xp)) } })
+      window.setTimeout(() => {
+        if (get().epiphany?.id === id) set({ epiphany: null })
+      }, 4200)
+    },
+
+    dryFish: (count) => {
+      const state = get()
+      const usable = state.bag.filter((c) => !c.junk)
+      if (!usable.length) {
+        state.toast('鱼篓里没有能上架晒的鱼', 'info')
+        return 0
+      }
+      const want = Math.max(1, Math.floor(count ?? usable.length))
+      const picked = usable.slice(0, Math.min(want, usable.length))
+      let left = picked.length
+      set({
+        bag: get().bag.filter((c) => {
+          if (c.junk || left <= 0) return true
+          left -= 1
+          return false
+        }),
+        pantry: {
+          ...get().pantry,
+          [DRIED_FISH_KEY]: (get().pantry[DRIED_FISH_KEY] ?? 0) + picked.length,
+        },
+      })
+      get().toast(`上风尾晒好 ${picked.length} 条鱼干`, 'gold')
+      gameEvents.emit('driedfish:made', { count: picked.length })
+      persist()
+      return picked.length
+    },
+
+    eatDriedFish: () => {
+      const state = get()
+      if (state.dead) return false
+      const have = state.pantry[DRIED_FISH_KEY] ?? 0
+      if (have <= 0) {
+        state.toast('口袋里没有鱼干 · 先晒一批', 'info')
+        return false
+      }
+      const waiting = DRIED_FISH_COOLDOWN_MS - (Date.now() - state.driedFishAt)
+      if (waiting > 0) {
+        state.toast(`嘴里还没咽干净 · 还需 ${(waiting / 1000).toFixed(1)} 秒`, 'info')
+        return false
+      }
+      const maxHp = maxHpFor(state.realm)
+      if (state.hp >= maxHp) {
+        state.toast('生命已满 · 这条鱼干留着救命', 'info')
+        return false
+      }
+      const heal = Math.max(1, Math.round(maxHp * DRIED_FISH_HEAL_RATIO))
+      set({
+        pantry: { ...state.pantry, [DRIED_FISH_KEY]: have - 1 },
+        driedFishAt: Date.now(),
+      })
+      state.healPlayer(heal)
+      state.toast(`嚼下一条鱼干 · 生命 +${heal}`, 'gold')
+      gameEvents.emit('driedfish:eaten', { heal })
+      persist()
+      return true
+    },
+
+    feedPetDriedFish: () => {
+      const state = get()
+      const have = state.pantry[DRIED_FISH_KEY] ?? 0
+      if (have <= 0) {
+        state.toast('没有鱼干，阿獭不买账', 'info')
+        return false
+      }
+      if (state.pet.affection >= 100) {
+        state.toast('阿獭的好感已经满了', 'info')
+        return false
+      }
+      set({
+        pantry: { ...state.pantry, [DRIED_FISH_KEY]: have - 1 },
+        pet: {
+          ...state.pet,
+          affection: clamp(state.pet.affection + 6, 0, 100),
+          lastFed: Date.now(),
+        },
+      })
+      get().toast('阿獭抱着鱼干滚了三圈 · 好感 +6', 'gold')
+      persist()
+      return true
+    },
+
+    feedCrewDriedFish: (id) => {
+      const state = get()
+      if (!state.crew.includes(id)) {
+        state.toast('这位还没上船，先去找他签约', 'info')
+        return false
+      }
+      const have = state.pantry[DRIED_FISH_KEY] ?? 0
+      if (have <= 0) {
+        state.toast('没有鱼干可分 · 船员只认这个', 'info')
+        return false
+      }
+      const member = crewById(id)
+      const current = state.crewAffinity[id] ?? 0
+      if (current >= CREW_AFFINITY_MAX) {
+        state.toast(`${member?.name ?? '船员'}与你默契无间，再添就溢了`, 'info')
+        return false
+      }
+      set({
+        pantry: { ...state.pantry, [DRIED_FISH_KEY]: have - 1 },
+        crewAffinity: {
+          ...state.crewAffinity,
+          [id]: Math.min(CREW_AFFINITY_MAX, current + 12),
+        },
+      })
+      get().toast(
+        `${member?.name ?? '船员'}分到你半条鱼干 · 好感 +12，渔获分成更厚`,
+        'gold',
+      )
+      persist()
+      return true
+    },
+
     recordContestResult: (won, opponent) => {
       const state = get()
       if (won) {
@@ -3018,6 +3202,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         traps: [],
         dailySold: { day: todayKey, value: 0 },
         gatherCooldowns: {},
+        crewAffinity: {},
         stats: { cooked: 0, harvested: 0, gathered: 0, soldValue: 0 },
         hp: MAX_HP,
         realm: 0,
@@ -3035,12 +3220,15 @@ export const useGameStore = create<GameStore>()((set, get) => {
         factionChoiceOpen: false,
         sectAt: null,
         contest: null,
+        demon: null,
+        epiphany: null,
+        driedFishAt: 0,
         tribulation: null,
         skillCds: [],
         ascension: null,
         ownedWeapons: ['knife'],
         equippedWeapon: 'knife',
-        weaponAmmo: { knife: 0, speargun: 6 },
+        weaponAmmo: { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0 },
         ownedFacilities: [],
         installedFacilities: sanitizeInstalled(undefined, 'rowboat'),
         facilityActive: {},
@@ -3116,6 +3304,7 @@ export function isModalOpen(state: GameStore = useGameStore.getState()) {
       state.factionChoiceOpen ||
       state.sectAt !== null ||
       (state.contest !== null && state.contest.phase !== 'fighting') ||
+      state.demon !== null ||
       state.dead,
   )
 }
