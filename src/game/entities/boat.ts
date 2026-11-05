@@ -459,6 +459,8 @@ export class Boat {
   boostActive = false
   /** 御剑飞行：离水高度，0 表示仍在水面 */
   flyHeight = 0
+  /** 起跳离水的那一段高度，只有胖猪大王的冲击波会用到 */
+  hopLift = 0
   private builtSkin: BoatSkinId | null = null
   private night = false
   private pirateLanternLight: THREE.PointLight | null = null
@@ -2067,7 +2069,7 @@ export class Boat {
     const bob = Math.sin(time * 1.15 + this.bobPhase)
     const flying = this.flyHeight > 0.2
     this.group.position.y =
-      wave + 0.04 + this.flyHeight + bob * (flying ? 0.012 : 0.032) * this.bobMul
+      wave + 0.04 + this.flyHeight + this.hopLift + bob * (flying ? 0.012 : 0.032) * this.bobMul
     this.group.rotation.y = this.heading
     this.group.rotation.z = flying
       ? -steer * 0.3 + Math.sin(time * 0.9 + this.bobPhase) * 0.05

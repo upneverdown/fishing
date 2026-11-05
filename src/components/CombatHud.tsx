@@ -154,7 +154,9 @@ function BossBar() {
             {ultimate && boss.phase <= 1
               ? boss.id === 'huang'
                 ? '终极 · 天罚降世'
-                : '终极 · 龙王降临'
+                : boss.id === 'pig'
+                  ? '终极 · 魔化野猪王'
+                  : '终极 · 龙王降临'
               : enraged
                 ? `狂暴 · 第${boss.phase}阶段`
                 : '首领战'}

@@ -19,7 +19,13 @@ export type WaterId = 'bay' | 'creek' | 'falls' | 'mirror' | 'farsea' | 'trench'
 /** 凡界海湾 / 天界云海：两张可往返的地图 */
 export type MapZone = 'mortal' | 'celestial'
 
-export type WeaponId = 'knife' | 'speargun' | 'bonestaff' | 'dragonblade' | 'lightningrod'
+export type WeaponId =
+  | 'knife'
+  | 'speargun'
+  | 'bonestaff'
+  | 'dragonblade'
+  | 'lightningrod'
+  | 'pigtusk'
 
 export type FacilityId = 'fishfinder' | 'livewell' | 'searchlight' | 'grill' | 'anchor'
 

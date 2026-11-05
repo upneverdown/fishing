@@ -57,6 +57,7 @@ import { ThunderLure } from '@/game/sect/thunderlure'
 import { ContestArena, CONTEST_POINT } from '@/game/sect/contestArena'
 import { InnerDemon } from '@/game/demon/innerDemon'
 import { HUANG_ID, HUANG_NAME, HuangBoss } from '@/game/huang/huangBoss'
+import { PIG_ID, PIG_NAME, PigBoss } from '@/game/pig/pigBoss'
 import { isCorrectAnswer, randomQuiz, type QuizDef } from '@/game/demon/quizBank'
 import { equippedLevel, fishingBlessing, hasTechnique, FISH_XP_BY_RARITY } from '@/game/sect/blessings'
 import { techniqueById, techniqueValue } from '@/game/sect/techniques'
@@ -88,6 +89,9 @@ const DEMON_QUIZ_SECONDS = 15
 const DEMON_MAX_ROUNDS = 6
 /** 一口气潜太久，心魔就从深水里浮上来 */
 const DEMON_DWELL_LIMIT = 88
+/** 起跳：从蹬船到落回水面，够躲过一圈冲击波 */
+const HOP_AIRTIME = 0.9
+const HOP_LIFT = 4.2
 const EPIPHANY_LINES = [
   '浪纹里看穿了周天',
   '一口换气，忽然懂了',
@@ -126,9 +130,12 @@ export class Game {
   readonly contest: ContestArena
   readonly demon: InnerDemon
   readonly huang: HuangBoss
+  readonly pig: PigBoss
 
   /** 《天雷引》冷却 */
   private thunderCd = 0
+  /** 起跳躲冲击波：离水的那点时间 */
+  private hopT = 0
   /** 《御剑飞行》是否已踏剑离水 */
   private swordFlight = false
   private thunderTarget = new THREE.Vector3()
@@ -391,6 +398,29 @@ export class Game {
       onLoot: () => {
         useGameStore.getState().grantHuangLoot()
       },
+    })
+    this.pig = new PigBoss(this.scene, this.world, {
+      onDefeated: () => {
+        const state = useGameStore.getState()
+        gameEvents.emit('boss:defeated', { id: PIG_ID, name: PIG_NAME, ultimate: true })
+        gameEvents.emit('pig:defeated', {})
+        state.announce(
+          '全 服 公 告',
+          [
+            `${PIG_NAME}小山似的身子塌进海里 · 缠身的魔气散了`,
+            '海面上浮起半根还在发紫光的獠牙',
+            '凡在此刻还在航行的船，都亲眼看见一头野兽谢了幕',
+          ],
+          11,
+        )
+        state.toast('胖猪大王倒了 · 【胖猪的獠牙】浮在水面，靠近按 E 收走', 'gold')
+        this.impactShake = Math.max(this.impactShake, 1.6)
+        audio.thunder()
+      },
+      onLoot: () => {
+        useGameStore.getState().grantPigLoot()
+      },
+      isAirborne: () => this.boat.hopLift > 1.2,
     })
     this.world.setCelestialSurface((x, z, t) => this.celestial.surfaceAt(x, z, t))
     this.celestial.setRimTarget(this.boat.group)
@@ -939,6 +969,7 @@ export class Game {
       !this.creatures.introActive &&
       !this.cultivation.tribulating &&
       !this.huang.isActive &&
+      !this.pig.isActive &&
       !ascending &&
       !this.travelTarget
     ) {
@@ -962,6 +993,12 @@ export class Game {
 
     if (input.consumeHuangSummon()) this.summonHuang('长按 K')
     if (!modal) this.updateHuang(dt, time)
+    if (input.consumePigSummon()) this.summonPig('P')
+    if (!modal) {
+      this.handleJumpPress(store)
+      this.updatePig(dt, time)
+    }
+    this.updateHop(dt)
 
     if (store.underwater) {
       this.updateUnderwater(dt, time, store, modal)
@@ -1120,7 +1157,7 @@ export class Game {
         this.boat.heading,
       )
     }
-    if (!modal && !this.cultivation.tribulating && !this.huang.isActive) {
+    if (!modal && !this.cultivation.tribulating && !this.huang.isActive && !this.pig.isActive) {
       this.creatures.update(dt, time, {
         position: this.boat.position,
         underwater: false,
@@ -1514,6 +1551,8 @@ export class Game {
     const scorched = this.contest.strike(center, radius, boltDamage)
     const struckHuang = this.huang.hitPoint(center, radius, boltDamage)
     if (struckHuang) this.clashOnHuang(center)
+    const struckPig = this.pig.hitPoint(center, radius, boltDamage)
+    if (struckPig) this.clashOnPig(center)
 
     let bagged = 0
     const capacity = bagCapacity(store)
@@ -1774,6 +1813,14 @@ export class Game {
         if (!this.huang.isActive) return '黄达鑫不在场'
         this.huang.hitPoint(this.huang.bodyPosition, 999, 99999)
         return '天罚到头了'
+      case 'summon_pig':
+        return this.summonPig('作弊控制台')
+          ? '胖猪大王正在冲过来 · 抓好你的船'
+          : '召唤被拒绝：先确认没有别的 Boss 在场、你也还没死'
+      case 'kill_pig':
+        if (!this.pig.isActive) return '胖猪大王不在场'
+        this.pig.hitPoint(this.pig.bodyPosition, 999, 99999)
+        return '小山塌了'
       case 'heal':
         store.healPlayer(maxHpFor(store.realm))
         return '血线拉满'
@@ -1790,7 +1837,7 @@ export class Game {
         return '境界已改写'
       }
       case 'help':
-        return '可用：summon_huang / kill_huang / heal / money <±数> / realm <0-9>'
+        return '可用：summon_huang / kill_huang / summon_pig / kill_pig / heal / money <±数> / realm <0-9>'
       default:
         return `看不懂「${name || '空'}」· 输入 help 看指令表`
     }
@@ -1805,9 +1852,78 @@ export class Game {
     }
   }
 
-  /** 镜头与自动锁向要跟的目标：黄达鑫不走 creatures 那一套 */
+  // ------------------------------------------------------------- 胖猪大王
+
+  /** 两处入口共用：按 P、控制台的 summon_pig */
+  summonPig(source: string) {
+    const store = useGameStore.getState()
+    if (this.pig.isActive) return false
+    if (store.dead || store.demon || this.demon.isActive) return false
+    if (this.contest.active || this.gate.isActive || this.crossTimer > 0) return false
+    if (this.cultivation.tribulating || this.creatures.introActive) return false
+    if (store.boss) {
+      store.toast(`${store.boss.name}还没倒 · 胖猪大王不肯插队`, 'info')
+      return false
+    }
+
+    this.fishing.reset()
+    this.seaEvents.cancel()
+    this.setSwordFlight(false)
+    this.clearWaterBullets()
+    this.attackState = null
+    this.pig.summon(this.boat.position, 2400 + store.realm * 280)
+    this.impactShake = Math.max(this.impactShake, 2.4)
+    gameEvents.emit('pig:summon', {})
+    store.setCombatCamera(true)
+    store.toast(`${source}按下 · 「${PIG_NAME}」从海平线上狂奔过来`, 'danger')
+    return true
+  }
+
+  private updatePig(dt: number, time: number) {
+    if (!this.pig.isActive && !this.pig.hasLoot) return
+    this.pig.update(dt, time, this.boat.position)
+    if (this.pig.shakeRequest > 0) {
+      this.impactShake = Math.max(this.impactShake, this.pig.shakeRequest)
+      this.pig.shakeRequest = 0
+    }
+  }
+
+  /** 空格那一下：只有胖猪大王这一场把它从鱼竿手里借走，用来起跳 */
+  private handleJumpPress(store: ReturnType<typeof useGameStore.getState>) {
+    if (!input.consumeJump()) return
+    if (!this.pig.isActive || store.underwater || store.dead) return
+    if (this.fishing.phase !== 'idle' || this.hopT > 0) return
+    input.cancelActionPress()
+    this.hopT = HOP_AIRTIME
+    audio.splash(0.6)
+    this.world.foam.splash(this.boat.position.x, this.boat.position.z, 6, 0.8)
+  }
+
+  private updateHop(dt: number) {
+    if (this.hopT > 0) {
+      this.hopT = Math.max(0, this.hopT - dt)
+      this.boat.hopLift = Math.sin((1 - this.hopT / HOP_AIRTIME) * Math.PI) * HOP_LIFT
+      return
+    }
+    if (this.boat.hopLift !== 0) this.boat.hopLift = 0
+  }
+
+  /** 砍中胖猪大王：他的血条自己更新，这里只补一声闷响和一蓬紫气 */
+  private clashOnPig(at: THREE.Vector3) {
+    this.world.foam.splash(at.x, at.z, 5, 0.9)
+    this.impactShake = Math.max(this.impactShake, 0.3)
+    audio.snap()
+  }
+
+  /** 收藏了【胖猪的獠牙】：全部兵刃都磨利一分 */
+  private tuskPolish(store: ReturnType<typeof useGameStore.getState>) {
+    return store.ownedWeapons.includes('pigtusk') ? 1.15 : 1
+  }
+
+  /** 镜头与自动锁向要跟的目标：黄达鑫和胖猪大王不走 creatures 那一套 */
   private bossAnchor(id: string, out: THREE.Vector3) {
     if (id === HUANG_ID) return this.huang.isActive ? out.copy(this.huang.bodyPosition) : null
+    if (id === PIG_ID) return this.pig.isActive ? out.copy(this.pig.headPosition) : null
     return this.creatures.bossPosition(id, out)
   }
 
@@ -1815,7 +1931,7 @@ export class Game {
   private openDemonSpace(reason: string) {
     const store = useGameStore.getState()
     if (store.demon || this.demon.isActive) return
-    if (this.huang.isActive) return
+    if (this.huang.isActive || this.pig.isActive) return
     if (this.contest.active || this.gate.isActive || this.crossTimer > 0) return
     if (this.cultivation.tribulating || store.dead) return
 
@@ -2484,6 +2600,17 @@ export class Game {
         }
       }
     }
+    if (this.pig.hasLoot) {
+      const loot = this.pig.lootPrompt(boat)
+      if (loot) {
+        return {
+          kind: 'pigloot' as const,
+          id: null,
+          prompt: `【${loot.name}】浮在水面 · 还缠着没散尽的魔气`,
+          label: '拾取',
+        }
+      }
+    }
     if (this.world.isCelestial) {
       const sect = this.sectHalls.nearestGate(boat)
       if (sect) {
@@ -2648,6 +2775,9 @@ export class Game {
     this.attackState = null
     // 死了就是死了，天罚也一并收走
     this.huang.despawn()
+    this.pig.despawn()
+    this.hopT = 0
+    this.boat.hopLift = 0
     // 死一次就把心魔空间清账，免得复活后还困在墨色里
     this.demon.dismiss(0.2)
     this.demonBlank = 0
@@ -2787,15 +2917,17 @@ export class Game {
       const mirror = this.contest.active ? this.contest.opponentPosition : null
       const brushedMirror = Boolean(mirror && bullet.mesh.position.distanceTo(mirror) < 1.8)
       const brushedHuang = this.huang.hitPoint(bullet.mesh.position, 1.6, bullet.damage)
+      const brushedPig = this.pig.hitPoint(bullet.mesh.position, 1.6, bullet.damage)
       // 心魔空间里物理攻击一律无效，水弹穿过去什么也打不到
       const brushedDemon = Boolean(
         !store.demon && this.demon.isActive && bullet.mesh.position.distanceTo(this.demon.headPosition) < 2.2,
       )
-      if (hit || brushedMirror || brushedDemon || brushedHuang) {
+      if (hit || brushedMirror || brushedDemon || brushedHuang || brushedPig) {
         if (brushedMirror && this.contest.strike(bullet.mesh.position, 1.8, bullet.damage)) {
           this.contestFeedback()
         }
         if (brushedHuang) this.clashOnHuang(this.huang.headPosition)
+        if (brushedPig) this.clashOnPig(this.pig.headPosition)
         if (brushedDemon) this.rejectPhysicalAttacks(store)
         this.seaEvents.strike(bullet.mesh.position, this.waterBulletDir, 1.6, bullet.damage)
         this.bulletBurst(bullet.mesh.position, 0.9)
@@ -3206,18 +3338,24 @@ export class Game {
     const range = isOnBoat ? def.range + 4.6 : def.range
     const faction = factionOf(store.playerFaction)
     const damage = Math.round(
-      def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm) * faction.attackMul,
+      def.damage *
+        crewDamageMul(store.crew) *
+        realmAttackMul(store.realm) *
+        faction.attackMul *
+        this.tuskPolish(store),
     )
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
     const huang = this.huang.hitRay(origin, this.viewDir, range, damage)
+    const pig = this.pig.hitRay(origin, this.viewDir, range, damage)
     this.seaEvents.strike(origin, this.viewDir, range, damage)
-    if (hits || huang) this.applyLeech(damage * faction.lifesteal, `${def.name}饮血`)
+    if (hits || huang || pig) this.applyLeech(damage * faction.lifesteal, `${def.name}饮血`)
     if (huang) this.clashOnHuang(origin)
+    if (pig) this.clashOnPig(this.pig.headPosition)
     if (this.contest.strike(origin, range, damage, this.viewDir)) {
       this.applyLeech(damage * faction.lifesteal, '一刀斩向心魔')
       this.contestFeedback()
     }
-    if (isOnBoat && !hits && !huang && !this.contest.active) {
+    if (isOnBoat && !hits && !huang && !pig && !this.contest.active) {
       const fish = this.findBoatFish(range, 0.1)
       if (fish) this.catchSurfaceFish(fish, 0.62)
     }
@@ -3244,7 +3382,11 @@ export class Game {
     }
     const faction = factionOf(store.playerFaction)
     const damage = Math.round(
-      def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm) * faction.attackMul,
+      def.damage *
+        crewDamageMul(store.crew) *
+        realmAttackMul(store.realm) *
+        faction.attackMul *
+        this.tuskPolish(store),
     )
     if (def.id === 'bonestaff') {
       this.spitWaterBullet(def, origin, this.viewDir, damage)
@@ -3252,9 +3394,18 @@ export class Game {
     }
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
     const huang = this.huang.hitRay(origin, this.viewDir, def.range, damage)
+    const pig = this.pig.hitRay(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
     const pierced = this.contest.strike(origin, def.range, damage, this.viewDir)
-    if (hit || huang) this.applyLeech(damage * faction.lifesteal, '鱼枪饮血')
+    if (hit || huang || pig) this.applyLeech(damage * faction.lifesteal, '鱼枪饮血')
+    if (pig) {
+      const mark = this.pig.headPosition
+      this.showSpearRope(mark, 0.6)
+      this.flashMuzzle(mark)
+      this.clashOnPig(mark)
+      audio.snap()
+      return
+    }
     if (huang) {
       const mark = this.huang.headPosition
       this.showSpearRope(mark, 0.6)
@@ -3424,10 +3575,10 @@ export class Game {
     }
 
     if (input.consumeDive()) {
-      if (store.boss && store.boss.id !== HUANG_ID) {
+      if (store.boss && store.boss.id !== HUANG_ID && store.boss.id !== PIG_ID) {
         store.toggleCombatCamera()
       } else if (store.boss && this.fishing.phase === 'idle') {
-        // 只有黄达鑫这一场允许潜下去躲：海底七丈半以上是唯一的生门之一
+        // 只有黄达鑫和胖猪大王这两场允许潜下去躲：海底七丈半以上是唯一的生门之一
         store.setUnderwater(true)
       } else if (this.world.isCelestial) {
         store.toast('天界只有云海 · 不必下潜', 'info')
@@ -3511,6 +3662,10 @@ export class Game {
       }
       if (info.kind === 'huangloot') {
         this.huang.collectLoot()
+        return
+      }
+      if (info.kind === 'pigloot') {
+        this.pig.collectLoot()
         return
       }
       if (info.kind === 'salvage') {
@@ -3956,6 +4111,7 @@ export class Game {
     this.contest.dispose()
     this.demon.dispose()
     this.huang.dispose()
+    this.pig.dispose()
     this.gate.dispose()
     this.achievements.dispose()
     this.post.dispose()

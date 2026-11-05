@@ -88,7 +88,7 @@ export function DevConsole() {
                 if (e.key === 'Enter') submit()
                 e.stopPropagation()
               }}
-              placeholder="summon_huang"
+              placeholder="summon_pig"
               spellCheck={false}
               className="flex-1 bg-transparent font-mono text-[12px] text-foam outline-none placeholder:text-foam/25"
             />

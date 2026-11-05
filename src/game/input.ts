@@ -37,6 +37,8 @@ class InputController {
   private thunderPress = false
   private flightPress = false
   private zonePress = false
+  private pigPress = false
+  private jumpPress = false
   private huangPress = false
   private slotPress = 0
   /** K 键按下的起始时刻；K 单点是射击，长按才算召唤，用于避开键位冲突 */
@@ -128,7 +130,10 @@ class InputController {
     if (key === ' ' || key === 'spacebar') {
       e.preventDefault()
       this.spaceHeld = true
-      if (!e.repeat) this.pressAction('keyboard')
+      if (!e.repeat) {
+        this.jumpPress = true
+        this.pressAction('keyboard')
+      }
       return
     }
     if (e.repeat) return
@@ -156,7 +161,11 @@ class InputController {
     if (key === 'm') this.crewPress = true
     if (key === 'u') this.thunderPress = true
     if (key === 'o') this.flightPress = true
-    if (key === 'p') this.zonePress = true
+    if (key === 'p') {
+      // P 让给胖猪大王，天界与凡间之间的传送改按 Shift+P
+      if (e.shiftKey) this.zonePress = true
+      else this.pigPress = true
+    }
     if (key === '1') this.slotPress = 1
     if (key === '2') this.slotPress = 2
     if (key === '3') this.slotPress = 3
@@ -378,6 +387,19 @@ class InputController {
     return pressed
   }
 
+  consumePigSummon() {
+    const pressed = this.pigPress
+    this.pigPress = false
+    return pressed
+  }
+
+  /** 空格的一次按下：胖猪大王在场时先被起跳拿走 */
+  consumeJump() {
+    const pressed = this.jumpPress
+    this.jumpPress = false
+    return pressed
+  }
+
   consumeLook() {
     const dx = this.lookX
     const dy = this.lookY
@@ -489,6 +511,8 @@ class InputController {
     this.thunderPress = false
     this.flightPress = false
     this.zonePress = false
+    this.pigPress = false
+    this.jumpPress = false
     this.huangPress = false
     this.holdSince = 0
     this.slotPress = 0
@@ -530,6 +554,8 @@ class InputController {
     this.thunderPress = false
     this.flightPress = false
     this.zonePress = false
+    this.pigPress = false
+    this.jumpPress = false
     this.huangPress = false
     this.slotPress = 0
     this.clickPoint = null

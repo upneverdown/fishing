@@ -18,7 +18,7 @@ export interface WeaponDef {
   ammoPrice: number
   color: string
   notes: string[]
-  /** 非商店货：只有打到黄达鑫才会掉出来 */
+  /** 非商店货：只有打到黄达鑫或胖猪大王才会掉出来 */
   hidden?: boolean
 }
 
@@ -107,6 +107,24 @@ export const WEAPONS: WeaponDef[] = [
     ammoPrice: 0,
     color: '#8ff2ff',
     notes: ['近战 · 范围重击', '持握时雷系伤害完全无效', '黄达鑫掉落 · 非卖品'],
+    hidden: true,
+  },
+  {
+    id: 'pigtusk',
+    name: '胖猪的獠牙',
+    title: '魔牙 · 破阵锥',
+    tagline: '从猪王嘴上崩下来的半根獠牙，握在手里能把所有兵刃磨利一分。',
+    kind: 'melee',
+    price: 0,
+    damage: 176,
+    range: 9.4,
+    cooldown: 0.92,
+    windup: 0.2,
+    recover: 0.4,
+    ammoMax: 0,
+    ammoPrice: 0,
+    color: '#d8b4ff',
+    notes: ['近战 · 穿刺重击', '收藏后全体武器伤害 +15%', '胖猪大王掉落 · 非卖品'],
     hidden: true,
   },
 ]

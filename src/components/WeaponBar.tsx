@@ -1,4 +1,4 @@
-import { Bone, Crosshair, Sword, Wand2, Zap } from 'lucide-react'
+import { Axe, Bone, Crosshair, Sword, Wand2, Zap } from 'lucide-react'
 import { WEAPONS, weaponById } from '@/game/combat/weapons'
 import { useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ const ICONS: Record<WeaponId, typeof Sword> = {
   speargun: Crosshair,
   bonestaff: Wand2,
   lightningrod: Zap,
+  pigtusk: Axe,
 }
 
 /** 底部武器栏：1 键管近战、2 键管远程，点格子直接换手里那件 */

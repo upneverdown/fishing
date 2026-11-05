@@ -40,6 +40,7 @@ import {
 } from '@/game/shop/catalog'
 import { SEASONS, isSeasonId } from '@/game/world/seasons'
 import type { HuangHud } from '@/game/huang/huangBoss'
+import type { PigHud } from '@/game/pig/pigBoss'
 import { baitById, isBaitId } from '@/game/fishing/baitTable'
 import { FISH, createCatch, fishById, RARITY_ORDER } from '@/game/fishing/fishTable'
 import {
@@ -434,6 +435,8 @@ interface GameStore extends PersistedProgress {
   epiphany: EpiphanyNotice | null
   /** 非空即黄达鑫在场，纯运行时 */
   huang: HuangHud | null
+  /** 非空即胖猪大王在场，纯运行时 */
+  pig: PigHud | null
   /** 全服公告横幅 */
   notice: ServerNotice | null
   /** 上一次吃鱼干的时刻，10 秒冷却 */
@@ -574,6 +577,9 @@ interface GameStore extends PersistedProgress {
   setHuang: (hud: HuangHud | null) => void
   /** 发放黄达鑫的掉落，返回是否首次拿到避雷针 */
   grantHuangLoot: () => boolean
+  setPig: (hud: PigHud | null) => void
+  /** 发放胖猪大王的掉落，返回是否首次拿到獠牙 */
+  grantPigLoot: () => boolean
   announce: (title: string, lines: string[], seconds?: number) => void
   dismissNotice: () => void
   showEpiphany: (text: string, xp: number) => void
@@ -727,7 +733,7 @@ function readSave(): Partial<PersistedProgress> {
     }
     if (isWeaponId(p.equippedWeapon)) out.equippedWeapon = p.equippedWeapon
     if (isObj(p.weaponAmmo)) {
-      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0 }
+      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0, pigtusk: 0 }
       for (const weapon of WEAPONS) {
         ammo[weapon.id] = Math.max(0, Math.round(num(p.weaponAmmo[weapon.id], weapon.ammoMax)))
       }
@@ -1017,7 +1023,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     saved.equippedWeapon && ownedWeapons.includes(saved.equippedWeapon)
       ? saved.equippedWeapon
       : 'knife'
-  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0 }
+  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0, pigtusk: 0 }
   const ownedFacilities = saved.ownedFacilities ?? []
   const installedFacilities = sanitizeInstalled(saved.installedFacilities, initialBoat)
   const facilityActive = saved.facilityActive ?? {}
@@ -1310,6 +1316,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     demon: null,
     epiphany: null,
     huang: null,
+    pig: null,
     notice: null,
     driedFishAt: 0,
 
@@ -2318,6 +2325,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           phase: 'idle',
           boss: null,
           huang: null,
+          pig: null,
           combatCamera: false,
           inputLocked: false,
         })
@@ -2829,6 +2837,26 @@ export const useGameStore = create<GameStore>()((set, get) => {
       return firstRod
     },
 
+    setPig: (pig) => set({ pig }),
+
+    /** 胖猪大王的掉落：半根獠牙，拿到手就自动磨利全部兵刃 */
+    grantPigLoot: () => {
+      const state = get()
+      const firstTusk = !state.ownedWeapons.includes('pigtusk')
+      set({
+        ownedWeapons: firstTusk ? [...state.ownedWeapons, 'pigtusk'] : state.ownedWeapons,
+        equippedWeapon: firstTusk ? 'pigtusk' : state.equippedWeapon,
+      })
+      state.toast(
+        firstTusk
+          ? '拾得【胖猪的獠牙】· 全体武器伤害 +15%'
+          : '又崩下来半根獠牙 · 已入账',
+        'gold',
+      )
+      persist()
+      return firstTusk
+    },
+
     completeDragonBoatRace: (secondsLeft) => {
       const state = get()
       const timeBonus = Math.max(0, Math.round(secondsLeft)) * 10
@@ -3293,6 +3321,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         demon: null,
         epiphany: null,
         huang: null,
+        pig: null,
         notice: null,
         driedFishAt: 0,
         tribulation: null,
@@ -3300,7 +3329,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         ascension: null,
         ownedWeapons: ['knife'],
         equippedWeapon: 'knife',
-        weaponAmmo: { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0 },
+        weaponAmmo: { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0, pigtusk: 0 },
         ownedFacilities: [],
         installedFacilities: sanitizeInstalled(undefined, 'rowboat'),
         facilityActive: {},

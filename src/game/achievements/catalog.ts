@@ -55,6 +55,17 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     hidden: true,
   },
   {
+    id: 'pig_slayer',
+    name: '野猪骑士的终结',
+    desc: '把小山一样的「胖猪大王」放倒在海上',
+    category: 'combat',
+    target: 1,
+    unit: '次',
+    reward: 6666,
+    icon: 'swords',
+    hidden: true,
+  },
+  {
     id: 'deep_fear',
     name: '深海恐惧症',
     desc: '在水下累计停留 5 分钟',

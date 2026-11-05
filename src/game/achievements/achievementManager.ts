@@ -18,6 +18,9 @@ export class AchievementManager {
       gameEvents.on('huang:defeated', () => {
         this.advance('huang_slayer', 1)
       }),
+      gameEvents.on('pig:defeated', () => {
+        this.advance('pig_slayer', 1)
+      }),
       gameEvents.on('underwater:time', ({ seconds }) => {
         this.advance('deep_fear', seconds)
       }),

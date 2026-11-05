@@ -51,7 +51,8 @@ export function DesktopHints() {
         }
       : hint,
   )
-  if (ascended) hints.push({ keys: ['P'], label: celestial ? '传送回凡间' : '传送至天界' })
+  if (ascended) hints.push({ keys: ['⇧', 'P'], label: celestial ? '传送回凡间' : '传送至天界' })
+  hints.push({ keys: ['P'], label: '召唤终极大 Boss · 胖猪大王' })
   if (thunder) hints.push({ keys: ['U'], label: '天雷引 · 雷域麻鱼' })
   if (flight) hints.push({ keys: ['O'], label: '御剑飞行 · 踏剑离水' })
 
