@@ -39,6 +39,8 @@ import { SectDialog } from '@/components/SectDialog'
 import { ContestOverlay } from '@/components/ContestOverlay'
 import { DemonQuizOverlay } from '@/components/DemonQuizOverlay'
 import { EpiphanyNotice } from '@/components/EpiphanyNotice'
+import { HuangOverlay } from '@/components/HuangOverlay'
+import { DevConsole } from '@/components/DevConsole'
 import { VitalHud } from '@/components/VitalHud'
 import { WeaponBar } from '@/components/WeaponBar'
 import { useGameStore } from '@/store/useGameStore'
@@ -101,6 +103,7 @@ export default function App() {
           <ContestOverlay />
           <DemonQuizOverlay />
           <EpiphanyNotice />
+          <HuangOverlay />
           <VitalHud />
           {!underwater && <WeaponBar />}
           {underwater ? (
@@ -129,6 +132,7 @@ export default function App() {
       <CrewPanel />
       <PlayerSkinShop />
       <SectDialog />
+      <DevConsole />
 
       <AnimatePresence>
         {!started && <IntroScreen onStart={() => undefined} />}

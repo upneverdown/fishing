@@ -125,6 +125,23 @@ function BoatGlyph({ variant, accent }: { variant: BoatSkinId; accent: string })
           <path d="M20 28 l3 -5 3 5 -3 5 Z" fill={accent} fillOpacity="0.7" />
         </g>
       )}
+      {variant === 'thunder' && (
+        <g>
+          <path d="M22 38 Q32 48 54 48 H98 Q114 48 120 38 Z" fill="#2b3038" />
+          <path d="M24 38 H118 L114 43 H28 Z" fill="#465262" />
+          <path d="M28 42 H112" stroke={accent} strokeWidth="1.6" strokeOpacity="0.9" />
+          <path d="M70 36 V10" stroke="#465262" strokeWidth="2.4" />
+          <path d="M70 4 L67.5 12 H72.5 Z" fill={accent} />
+          <ellipse cx="70" cy="18" rx="9" ry="3" fill="none" stroke={accent} strokeWidth="1.2" strokeOpacity="0.8" />
+          <ellipse cx="70" cy="25" rx="6.5" ry="2.4" fill="none" stroke={accent} strokeWidth="1.1" strokeOpacity="0.6" />
+          <rect x="38" y="34" width="8" height="6" rx="1.5" fill="#465262" />
+          <rect x="94" y="34" width="8" height="6" rx="1.5" fill="#465262" />
+          <circle cx="42" cy="32" r="2.2" fill={accent} fillOpacity="0.9" />
+          <circle cx="98" cy="32" r="2.2" fill={accent} fillOpacity="0.9" />
+          <path d="M14 30 l6 4 -6 4" stroke={accent} strokeWidth="1.6" fill="none" strokeOpacity="0.7" />
+          <path d="M126 30 l-6 4 6 4" stroke={accent} strokeWidth="1.6" fill="none" strokeOpacity="0.7" />
+        </g>
+      )}
     </svg>
   )
 }
@@ -213,7 +230,7 @@ export function ShipyardDialog() {
     installFacility(emptySlot, id)
   }
   const previewStyle = BOAT_STYLES.find((style) => style.id === selectedBoat) ?? BOAT_STYLES[0]
-  const visibleBoatStyles = BOAT_STYLES.filter((style) => !style.hidden)
+  const visibleBoatStyles = BOAT_STYLES.filter((style) => !style.hidden || ownedItems.includes(style.id))
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>

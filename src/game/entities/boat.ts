@@ -210,6 +210,26 @@ const skySailMat = new THREE.MeshStandardMaterial({
   side: THREE.DoubleSide,
   depthWrite: false,
 })
+const thunderHullMat = new THREE.MeshStandardMaterial({
+  color: '#2b3038',
+  roughness: 0.46,
+  metalness: 0.78,
+  flatShading: true,
+})
+const thunderPlateMat = new THREE.MeshStandardMaterial({
+  color: '#465262',
+  roughness: 0.38,
+  metalness: 0.86,
+  flatShading: true,
+})
+const thunderArcMat = new THREE.MeshStandardMaterial({
+  color: '#7fe8ff',
+  emissive: '#4fe2ff',
+  emissiveIntensity: 1.6,
+  roughness: 0.24,
+  metalness: 0.4,
+  flatShading: true,
+})
 
 function tatteredSail(width: number, height: number) {
   const shape = new THREE.Shape()
@@ -350,6 +370,18 @@ const LAYOUTS: Record<BoatSkinId, BoatLayout> = {
     crate: [0.5, 0.6, 1.5],
     garland: { x: 0.86, y: 0.78, zFrom: -1.6, zTo: 1.7 },
     shadow: [2.8, 5.4],
+  },
+  thunder: {
+    angler: [0, 0.24, 1.2],
+    rod: [0.46, 1.04, -0.3],
+    creel: [-0.52, 0.66, 1.6],
+    creelVisible: true,
+    lantern: [0, 1.62, 2.2],
+    flag: [0, 1.04, 2.0],
+    figurehead: [0, 0.68, -2.8],
+    crate: [0.52, 0.64, 1.6],
+    garland: { x: 0.9, y: 0.8, zFrom: -1.8, zTo: 1.9 },
+    shadow: [3.0, 5.8],
   },
 }
 
@@ -509,10 +541,20 @@ export class Boat {
       pirate: { bob: 0.86, accel: 0.72 },
       dragonboat: { bob: 0.58, accel: 1.28 },
       skyboat: { bob: 0.24, accel: 1.42 },
+      thunder: { bob: 0.36, accel: 1.34 },
     }[style.id]
     this.bobMul = feel.bob
     this.accelMul = feel.accel
-    this.camScale = style.id === 'pirate' ? 1.36 : style.id === 'dragonboat' ? 1.18 : style.id === 'skyboat' ? 1.1 : 1
+    this.camScale =
+      style.id === 'pirate'
+        ? 1.36
+        : style.id === 'dragonboat'
+          ? 1.18
+          : style.id === 'skyboat'
+            ? 1.1
+            : style.id === 'thunder'
+              ? 1.12
+              : 1
     this.hullHalfWidth = style.id === 'pirate' ? 1.42 : style.id === 'dragonboat' ? 1.2 : 0
     this.hullHalfLength = style.id === 'pirate' ? 3.15 : style.id === 'dragonboat' ? 3.15 : 0
     const hullSize = {
@@ -524,6 +566,7 @@ export class Boat {
       pirate: [3.15, 1.42],
       dragonboat: [3.15, 1.2],
       skyboat: [2.5, 1.0],
+      thunder: [2.7, 1.08],
     }[style.id]
     this.collisionHalfLength = hullSize[0]
     this.collisionHalfWidth = hullSize[1]
@@ -536,6 +579,7 @@ export class Boat {
       pirate: { y: 0.78, halfWidth: 0.92, halfLength: 2.2, crewZ: [-1.75, 1.75] as [number, number] },
       dragonboat: { y: 0.5, halfWidth: 0.7, halfLength: 1.85, crewZ: [-1.5, 1.5] as [number, number] },
       skyboat: { y: 0.42, halfWidth: 0.6, halfLength: 1.4, crewZ: [-1.1, 1.1] as [number, number] },
+      thunder: { y: 0.5, halfWidth: 0.64, halfLength: 1.55, crewZ: [-1.2, 1.2] as [number, number] },
     }[style.id]
 
     if (this.builtSkin !== style.id) {
@@ -585,7 +629,100 @@ export class Boat {
     else if (id === 'submarine') this.buildSubmarine()
     else if (id === 'dragonboat') this.buildDragonBoat()
     else if (id === 'skyboat') this.buildSkyBoat()
+    else if (id === 'thunder') this.buildThunderBoat()
     else this.buildPirateShip()
+  }
+
+  /** 雷霆号：黑铁船壳、舷侧走电条，桅顶一根引雷针 —— 黄达鑫的掉落限定 */
+  private buildThunderBoat() {
+    const shape = new THREE.Shape()
+    shape.moveTo(0, 2.7)
+    shape.bezierCurveTo(0.62, 2.1, 1.02, 0.7, 1.04, -1.1)
+    shape.quadraticCurveTo(1.04, -2.2, 0.66, -2.5)
+    shape.lineTo(-0.66, -2.5)
+    shape.quadraticCurveTo(-1.04, -2.2, -1.04, -1.1)
+    shape.bezierCurveTo(-1.02, 0.7, -0.62, 2.1, 0, 2.7)
+
+    const hullGeo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.7,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: 0.06,
+      bevelSegments: 2,
+      curveSegments: 16,
+      steps: 1,
+    })
+    hullGeo.rotateX(-Math.PI / 2)
+    const hull = new THREE.Mesh(hullGeo, thunderHullMat)
+    hull.position.y = -0.06
+    hull.castShadow = true
+    hull.receiveShadow = true
+    this.hullGroup.add(hull)
+
+    const deckGeo = new THREE.ShapeGeometry(shape, 16)
+    deckGeo.scale(0.82, 0.88, 1)
+    deckGeo.rotateX(-Math.PI / 2)
+    const deck = new THREE.Mesh(deckGeo, thunderPlateMat)
+    deck.position.y = 0.4
+    deck.receiveShadow = true
+    this.hullGroup.add(deck)
+
+    for (const side of [-1, 1]) {
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.36, 4.4), thunderPlateMat)
+      plate.position.set(side * 0.86, 0.58, -0.05)
+      plate.castShadow = true
+      this.hullGroup.add(plate)
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 4.1), thunderArcMat)
+      strip.position.set(side * 0.94, 0.44, -0.05)
+      this.hullGroup.add(strip)
+      for (let i = 0; i < 7; i++) {
+        const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.062, 6, 5), thunderArcMat)
+        rivet.position.set(side * 0.95, 0.72, -1.9 + i * 0.63)
+        this.hullGroup.add(rivet)
+      }
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.24, 0.4, 10), thunderPlateMat)
+      coil.position.set(i === 1 ? 0 : (i === 0 ? -0.52 : 0.52), 0.62, 0.7 - i * 0.9)
+      coil.castShadow = true
+      this.hullGroup.add(coil)
+      for (let r = 0; r < 3; r++) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2 + r * 0.035, 0.018, 5, 18), thunderArcMat)
+        ring.rotation.x = Math.PI / 2
+        ring.position.set(coil.position.x, 0.7 + r * 0.09, coil.position.z)
+        this.hullGroup.add(ring)
+      }
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 7), thunderArcMat)
+      knob.position.set(coil.position.x, 0.98, coil.position.z)
+      this.hullGroup.add(knob)
+    }
+
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 2.1, 7), thunderPlateMat)
+    mast.position.set(0, 1.4, -0.1)
+    mast.castShadow = true
+    this.hullGroup.add(mast)
+    const needle = new THREE.Mesh(new THREE.ConeGeometry(0.1, 1.15, 8), thunderArcMat)
+    needle.position.set(0, 3.0, -0.1)
+    this.hullGroup.add(needle)
+    for (let i = 0; i < 2; i++) {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.34 + i * 0.2, 0.022, 5, 20), thunderArcMat)
+      halo.rotation.x = Math.PI / 2
+      halo.position.set(0, 2.1 + i * 0.42, -0.1)
+      this.hullGroup.add(halo)
+    }
+
+    const prow = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), thunderArcMat)
+    prow.position.set(0, 0.62, -2.3)
+    this.hullGroup.add(prow)
+
+    for (let i = 0; i < 4; i++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.26, 0.52), thunderArcMat)
+      const side = i < 2 ? -1 : 1
+      fin.position.set(side * 1.0, 0.2, -1.3 + (i % 2) * 1.9)
+      fin.rotation.y = side * 0.5
+      this.hullGroup.add(fin)
+    }
   }
 
   private buildSkyBoat() {

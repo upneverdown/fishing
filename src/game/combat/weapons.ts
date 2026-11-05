@@ -18,6 +18,8 @@ export interface WeaponDef {
   ammoPrice: number
   color: string
   notes: string[]
+  /** 非商店货：只有打到黄达鑫才会掉出来 */
+  hidden?: boolean
 }
 
 export const WEAPONS: WeaponDef[] = [
@@ -88,6 +90,24 @@ export const WEAPONS: WeaponDef[] = [
     ammoPrice: 0,
     color: '#e2c8ff',
     notes: ['近战 · 大范围重击', '前摇长但一刀顶三刀', '出手时船身会被压得一沉'],
+  },
+  {
+    id: 'lightningrod',
+    name: '达鑫的避雷针',
+    title: '天罚 · 引雷针',
+    tagline: '从他手里那副银表上拆下来的针，天雷一见就先扑它，不扑人。',
+    kind: 'melee',
+    price: 0,
+    damage: 138,
+    range: 8.6,
+    cooldown: 1.05,
+    windup: 0.26,
+    recover: 0.44,
+    ammoMax: 0,
+    ammoPrice: 0,
+    color: '#8ff2ff',
+    notes: ['近战 · 范围重击', '持握时雷系伤害完全无效', '黄达鑫掉落 · 非卖品'],
+    hidden: true,
   },
 ]
 

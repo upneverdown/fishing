@@ -39,6 +39,7 @@ import {
   type RodSkinId,
 } from '@/game/shop/catalog'
 import { SEASONS, isSeasonId } from '@/game/world/seasons'
+import type { HuangHud } from '@/game/huang/huangBoss'
 import { baitById, isBaitId } from '@/game/fishing/baitTable'
 import { FISH, createCatch, fishById, RARITY_ORDER } from '@/game/fishing/fishTable'
 import {
@@ -285,6 +286,16 @@ export interface EpiphanyNotice {
   xp: number
 }
 
+/** 全服公告横幅：终局事件用，纯运行时 */
+export interface ServerNotice {
+  id: number
+  title: string
+  lines: string[]
+}
+
+/** 伤害类型：雷系可被避雷针对消 */
+export type DamageType = 'physical' | 'lightning'
+
 /** 空白的功法表：新档与读档兜底共用 */
 export function emptyTechniques(): Record<TechniqueId, number> {
   return { taigong: 0, thunderlure: 0, swordflight: 0, starabsorb: 0 }
@@ -421,6 +432,10 @@ interface GameStore extends PersistedProgress {
   demon: DemonHud | null
   /** 顿悟飘字，几秒后自动清除 */
   epiphany: EpiphanyNotice | null
+  /** 非空即黄达鑫在场，纯运行时 */
+  huang: HuangHud | null
+  /** 全服公告横幅 */
+  notice: ServerNotice | null
   /** 上一次吃鱼干的时刻，10 秒冷却 */
   driedFishAt: number
 
@@ -492,7 +507,7 @@ interface GameStore extends PersistedProgress {
   abandonQuest: (id: string) => void
   claimQuest: (id: string) => boolean
   refreshDailyQuests: () => void
-  damagePlayer: (amount: number, source?: string) => boolean
+  damagePlayer: (amount: number, source?: string, type?: DamageType) => boolean
   healPlayer: (amount: number) => void
   /** 擂台判负时把玩家打到悬一线，不走普通死亡掉落渔获 */
   setHp: (value: number) => void
@@ -556,6 +571,11 @@ interface GameStore extends PersistedProgress {
   toggleTechnique: (id: TechniqueId) => boolean
   setContest: (hud: ContestHud | null) => void
   setDemon: (demon: DemonHud | null) => void
+  setHuang: (hud: HuangHud | null) => void
+  /** 发放黄达鑫的掉落，返回是否首次拿到避雷针 */
+  grantHuangLoot: () => boolean
+  announce: (title: string, lines: string[], seconds?: number) => void
+  dismissNotice: () => void
   showEpiphany: (text: string, xp: number) => void
   dryFish: (count?: number) => number
   eatDriedFish: () => boolean
@@ -707,7 +727,7 @@ function readSave(): Partial<PersistedProgress> {
     }
     if (isWeaponId(p.equippedWeapon)) out.equippedWeapon = p.equippedWeapon
     if (isObj(p.weaponAmmo)) {
-      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0 }
+      const ammo: Record<WeaponId, number> = { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0 }
       for (const weapon of WEAPONS) {
         ammo[weapon.id] = Math.max(0, Math.round(num(p.weaponAmmo[weapon.id], weapon.ammoMax)))
       }
@@ -938,6 +958,8 @@ function sanitizeStats(raw: StoreStats | undefined): StoreStats {
 let toastSeq = 0
 let achievementSeq = 0
 let epiphanySeq = 0
+let noticeSeq = 0
+let lightningBlockToastAt = 0
 let achievementPersistAt = 0
 
 export const useGameStore = create<GameStore>()((set, get) => {
@@ -995,7 +1017,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     saved.equippedWeapon && ownedWeapons.includes(saved.equippedWeapon)
       ? saved.equippedWeapon
       : 'knife'
-  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0 }
+  const weaponAmmo: Record<WeaponId, number> = saved.weaponAmmo ?? { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0 }
   const ownedFacilities = saved.ownedFacilities ?? []
   const installedFacilities = sanitizeInstalled(saved.installedFacilities, initialBoat)
   const facilityActive = saved.facilityActive ?? {}
@@ -1287,6 +1309,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     contest: null,
     demon: null,
     epiphany: null,
+    huang: null,
+    notice: null,
     driedFishAt: 0,
 
     setStarted: (started) => set({ started }),
@@ -2259,9 +2283,17 @@ export const useGameStore = create<GameStore>()((set, get) => {
       persist()
     },
 
-    damagePlayer: (amount, source = '海怪') => {
+    damagePlayer: (amount, source = '海怪', type = 'physical') => {
       const state = get()
       if (state.dead) return false
+      if (type === 'lightning' && (state.equippedWeapon === 'lightningrod' || state.boatSkin === 'thunder')) {
+        // 狂暴期雷柱密得像下雨，每条都报一次会把屏幕糊住
+        if (Date.now() - lightningBlockToastAt > 4200) {
+          lightningBlockToastAt = Date.now()
+          state.toast(`${source}落身 · 避雷针把天雷引偏，一分没伤`, 'gold')
+        }
+        return false
+      }
       const faction = factionOf(state.playerFaction)
       if (faction.dodgeChance > 0 && Math.random() < faction.dodgeChance) {
         state.toast(`${source}扑了个空 · 仙诀闪避`, 'gold')
@@ -2285,6 +2317,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           fight: null,
           phase: 'idle',
           boss: null,
+          huang: null,
           combatCamera: false,
           inputLocked: false,
         })
@@ -2772,6 +2805,30 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
     setDragonRace: (dragonRace) => set({ dragonRace }),
 
+    /** 黄达鑫的掉落：一把避雷针 + 一条雷霆号，首次拿到即刻上身 */
+    grantHuangLoot: () => {
+      const state = get()
+      const firstRod = !state.ownedWeapons.includes('lightningrod')
+      const firstShip = !state.ownedItems.includes('thunder')
+      set({
+        ownedWeapons: firstRod ? [...state.ownedWeapons, 'lightningrod'] : state.ownedWeapons,
+        equippedWeapon: firstRod ? 'lightningrod' : state.equippedWeapon,
+        ownedItems: firstShip ? [...state.ownedItems, 'thunder'] : state.ownedItems,
+        boatSkin: firstShip ? 'thunder' : state.boatSkin,
+        installedFacilities: firstShip
+          ? resizeInstalled(state.installedFacilities, 'thunder')
+          : state.installedFacilities,
+      })
+      state.toast(
+        firstRod || firstShip
+          ? '拾得【达鑫的避雷针】与限定船皮【雷霆号】· 从此天雷不沾身'
+          : '又是那一地雷渣 · 已入账',
+        'gold',
+      )
+      persist()
+      return firstRod
+    },
+
     completeDragonBoatRace: (secondsLeft) => {
       const state = get()
       const timeBonus = Math.max(0, Math.round(secondsLeft)) * 10
@@ -2973,6 +3030,19 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setContest: (contest) => set({ contest }),
 
     setDemon: (demon) => set({ demon }),
+
+    setHuang: (huang) => set({ huang }),
+
+    announce: (title, lines, seconds = 9) => {
+      noticeSeq += 1
+      const id = noticeSeq
+      set({ notice: { id, title, lines } })
+      window.setTimeout(() => {
+        if (get().notice?.id === id) set({ notice: null })
+      }, seconds * 1000)
+    },
+
+    dismissNotice: () => set({ notice: null }),
 
     showEpiphany: (text, xp) => {
       epiphanySeq += 1
@@ -3222,13 +3292,15 @@ export const useGameStore = create<GameStore>()((set, get) => {
         contest: null,
         demon: null,
         epiphany: null,
+        huang: null,
+        notice: null,
         driedFishAt: 0,
         tribulation: null,
         skillCds: [],
         ascension: null,
         ownedWeapons: ['knife'],
         equippedWeapon: 'knife',
-        weaponAmmo: { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0 },
+        weaponAmmo: { knife: 0, speargun: 6, bonestaff: 0, dragonblade: 0, lightningrod: 0 },
         ownedFacilities: [],
         installedFacilities: sanitizeInstalled(undefined, 'rowboat'),
         facilityActive: {},

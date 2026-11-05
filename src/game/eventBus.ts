@@ -5,6 +5,8 @@ import type { TechniqueId } from '@/game/sect/techniques'
 
 export interface GameEventMap {
   'boss:defeated': { id: string; name: string; ultimate: boolean }
+  'huang:defeated': Record<string, never>
+  'huang:summon': Record<string, never>
   'underwater:enter': { at: number }
   'underwater:time': { seconds: number }
   'boat:sailed': { meters: number; skin: BoatSkinId }

@@ -44,6 +44,17 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     icon: 'swords',
   },
   {
+    id: 'huang_slayer',
+    name: '替天行道',
+    desc: '把从深渊爬上来的「黄达鑫」重新打下去',
+    category: 'combat',
+    target: 1,
+    unit: '次',
+    reward: 8888,
+    icon: 'sparkles',
+    hidden: true,
+  },
+  {
     id: 'deep_fear',
     name: '深海恐惧症',
     desc: '在水下累计停留 5 分钟',

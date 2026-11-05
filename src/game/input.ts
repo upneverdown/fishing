@@ -1,5 +1,8 @@
 import { clamp } from '@/game/utils/math'
 
+/** 长按 K 多久算召唤黄达鑫，短于这个数只当普通开火 */
+const HUANG_HOLD_MS = 800
+
 class InputController {
   throttle = 0
   steer = 0
@@ -34,7 +37,10 @@ class InputController {
   private thunderPress = false
   private flightPress = false
   private zonePress = false
+  private huangPress = false
   private slotPress = 0
+  /** K 键按下的起始时刻；K 单点是射击，长按才算召唤，用于避开键位冲突 */
+  private holdSince = 0
   private joy = { x: 0, y: 0, active: false }
   private canvas: HTMLCanvasElement | null = null
   private lookEnabled = false
@@ -111,6 +117,14 @@ class InputController {
 
   private onKeyDown = (e: KeyboardEvent) => {
     const key = e.key.toLowerCase()
+    // 正在往输入框里打字时（开发者控制台、搜索框），游戏快捷键一律不响应
+    const target = e.target as HTMLElement | null
+    if (
+      target &&
+      (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+    ) {
+      return
+    }
     if (key === ' ' || key === 'spacebar') {
       e.preventDefault()
       this.spaceHeld = true
@@ -128,7 +142,10 @@ class InputController {
     if (key === 'f') this.toolPress = true
     if (key === 'g') this.townPress = true
     if (key === 'j') this.knifePress = true
-    if (key === 'k') this.gunPress = true
+    if (key === 'k') {
+      this.gunPress = true
+      this.holdSince = performance.now()
+    }
     if (key === 'y') this.anchorPress = true
     if (key === 'l') this.lightPress = true
     if (key === 'h') this.grillPress = true
@@ -150,6 +167,7 @@ class InputController {
   private onKeyUp = (e: KeyboardEvent) => {
     const key = e.key.toLowerCase()
     this.keys.delete(key)
+    if (key === 'k') this.holdSince = 0
     if (key === ' ' || key === 'spacebar') {
       this.spaceHeld = false
       this.releaseAction('keyboard')
@@ -191,6 +209,17 @@ class InputController {
     }
     this.throttle = clamp(throttle, -1, 1)
     this.steer = clamp(steer, -1, 1)
+    if (this.holdSince && performance.now() - this.holdSince >= HUANG_HOLD_MS) {
+      this.holdSince = 0
+      this.huangPress = true
+    }
+  }
+
+  /** 长按 K 攒出来的召唤信号 */
+  consumeHuangSummon() {
+    const pressed = this.huangPress
+    this.huangPress = false
+    return pressed
   }
 
   consumeAction() {
@@ -460,6 +489,8 @@ class InputController {
     this.thunderPress = false
     this.flightPress = false
     this.zonePress = false
+    this.huangPress = false
+    this.holdSince = 0
     this.slotPress = 0
     this.spaceHeld = false
     this.touchVertical = 0
@@ -499,6 +530,7 @@ class InputController {
     this.thunderPress = false
     this.flightPress = false
     this.zonePress = false
+    this.huangPress = false
     this.slotPress = 0
     this.clickPoint = null
   }

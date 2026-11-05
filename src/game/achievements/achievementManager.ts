@@ -15,6 +15,9 @@ export class AchievementManager {
       gameEvents.on('boss:defeated', (event) => {
         if (event.ultimate) this.advance('dragon_slayer', 1)
       }),
+      gameEvents.on('huang:defeated', () => {
+        this.advance('huang_slayer', 1)
+      }),
       gameEvents.on('underwater:time', ({ seconds }) => {
         this.advance('deep_fear', seconds)
       }),

@@ -1,4 +1,4 @@
-import { Bone, Crosshair, Sword, Wand2 } from 'lucide-react'
+import { Bone, Crosshair, Sword, Wand2, Zap } from 'lucide-react'
 import { WEAPONS, weaponById } from '@/game/combat/weapons'
 import { useGameStore } from '@/store/useGameStore'
 import { cn } from '@/lib/utils'
@@ -9,6 +9,7 @@ const ICONS: Record<WeaponId, typeof Sword> = {
   dragonblade: Bone,
   speargun: Crosshair,
   bonestaff: Wand2,
+  lightningrod: Zap,
 }
 
 /** 底部武器栏：1 键管近战、2 键管远程，点格子直接换手里那件 */
@@ -26,7 +27,7 @@ export function WeaponBar() {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-[6.4rem] z-20 flex justify-center px-3 sm:bottom-4">
       <div className="glass flex items-end gap-1.5 rounded-xl border-foam/12 px-2 py-1.5">
-        {SLOTS.map((def) => {
+        {SLOTS.filter((def) => !def.hidden || owned.includes(def.id)).map((def) => {
           const Icon = ICONS[def.id] ?? Sword
           const has = owned.includes(def.id)
           const isActive = equipped === def.id

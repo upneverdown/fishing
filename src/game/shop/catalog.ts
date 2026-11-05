@@ -9,6 +9,7 @@ export type BoatSkinId =
   | 'pirate'
   | 'dragonboat'
   | 'skyboat'
+  | 'thunder'
 export type RodSkinId = 'classic' | 'tide' | 'ember' | 'aurora' | 'immortal'
 export type DecorationId = 'figurehead' | 'garland' | 'flag' | 'crate'
 
@@ -210,6 +211,25 @@ export const BOAT_STYLES: BoatStyle[] = [
     durability: 300,
     weatherproof: true,
     waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+  },
+  {
+    id: 'thunder',
+    name: '雷霆号',
+    title: '雷舟',
+    tagline: '黑铁船壳，桅顶挑一根引雷针，落雷先劈针再劈人——从今往后天雷只认船，不认你。',
+    price: 0,
+    speed: 1.44,
+    turn: 1.02,
+    accent: '#7fe8ff',
+    tier: 5,
+    classLabel: '雷舟',
+    capacity: 32,
+    gearCap: 3,
+    facilitySlots: 4,
+    durability: 340,
+    weatherproof: true,
+    waters: ['bay', 'creek', 'falls', 'mirror', 'farsea', 'trench'],
+    hidden: true,
   },
 ]
 

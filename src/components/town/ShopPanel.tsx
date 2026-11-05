@@ -347,6 +347,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 export function ShopPanel() {
   const gear = useGameStore((s) => s.gear)
   const money = useGameStore((s) => s.money)
+  const ownedWeapons = useGameStore((s) => s.ownedWeapons)
   const upgradeGear = useGameStore((s) => s.upgradeGear)
 
   return (
@@ -401,9 +402,9 @@ export function ShopPanel() {
           </span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          {WEAPONS.map((weapon) => (
-            <WeaponCard key={weapon.id} id={weapon.id} />
-          ))}
+          {WEAPONS.filter((weapon) => !weapon.hidden || ownedWeapons.includes(weapon.id)).map(
+            (weapon) => <WeaponCard key={weapon.id} id={weapon.id} />,
+          )}
         </div>
       </div>
 

@@ -214,6 +214,8 @@ export class World {
   private celestialSurface: ((x: number, z: number, time: number) => number) | null = null
   private hover = 0
   private hoverTarget = 0
+  private waveBoost = 1
+  private waveBoostTarget = 1
 
   constructor(private scene: THREE.Scene) {
     const spring = lookFrom(SEASONS.spring)
@@ -412,10 +414,14 @@ export class World {
     this.doomTarget = THREE.MathUtils.clamp(amount, 0, 1)
   }
 
+  /** 浪高倍率：黄达鑫升起来时整片海会沸起来 */
+  setWaveBoost(scale: number) {
+    this.waveBoostTarget = THREE.MathUtils.clamp(scale, 1, 4)
+  }
+
   get doomStrength() {
     return this.doom
   }
-
   get stormStrength() {
     return this.storm
   }
@@ -499,7 +505,7 @@ export class World {
       })
       this.water.setFogColor(UNDERWATER_FOG)
       this.water.setFogRange(0.5, 46)
-      this.water.setWaveScale(look.waveScale)
+      this.water.setWaveScale(look.waveScale * this.waveBoost)
       this.water.setSun(new THREE.Vector3(0.2, 1, 0.15).normalize(), new THREE.Color('#bfeefc'))
     } else {
       background.copy(look.horizon)
@@ -518,7 +524,7 @@ export class World {
       })
       this.water.setFogColor(fog.color)
       this.water.setFogRange(fog.near, fog.far)
-      this.water.setWaveScale(look.waveScale)
+      this.water.setWaveScale(look.waveScale * this.waveBoost)
       this.water.setSun(this.sunDir, look.sun)
     }
 
@@ -565,6 +571,7 @@ export class World {
     this.storm += (this.stormTarget - this.storm) * (1 - Math.exp(-dt * 1.7))
     this.doom += (this.doomTarget - this.doom) * (1 - Math.exp(-dt * 2.6))
     this.hover += (this.hoverTarget - this.hover) * (1 - Math.exp(-dt * 2.4))
+    this.waveBoost += (this.waveBoostTarget - this.waveBoost) * (1 - Math.exp(-dt * 1.1))
     this.lightningFlash = Math.max(0, this.lightningFlash - dt * 2.6)
     this.lerpLook(dt)
     this.applyScene(center)

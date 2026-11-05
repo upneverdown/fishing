@@ -56,6 +56,7 @@ import { SectHalls, SECT_ELDERS } from '@/game/sect/sectHalls'
 import { ThunderLure } from '@/game/sect/thunderlure'
 import { ContestArena, CONTEST_POINT } from '@/game/sect/contestArena'
 import { InnerDemon } from '@/game/demon/innerDemon'
+import { HUANG_ID, HUANG_NAME, HuangBoss } from '@/game/huang/huangBoss'
 import { isCorrectAnswer, randomQuiz, type QuizDef } from '@/game/demon/quizBank'
 import { equippedLevel, fishingBlessing, hasTechnique, FISH_XP_BY_RARITY } from '@/game/sect/blessings'
 import { techniqueById, techniqueValue } from '@/game/sect/techniques'
@@ -124,6 +125,7 @@ export class Game {
   readonly thunder: ThunderLure
   readonly contest: ContestArena
   readonly demon: InnerDemon
+  readonly huang: HuangBoss
 
   /** 《天雷引》冷却 */
   private thunderCd = 0
@@ -367,6 +369,29 @@ export class Game {
     this.thunder = new ThunderLure(this.scene)
     this.contest = new ContestArena(this.scene)
     this.demon = new InnerDemon(this.scene)
+    this.huang = new HuangBoss(this.scene, this.world, {
+      onDefeated: () => {
+        const state = useGameStore.getState()
+        gameEvents.emit('boss:defeated', { id: HUANG_ID, name: HUANG_NAME, ultimate: true })
+        gameEvents.emit('huang:defeated', {})
+        state.announce(
+          '全 服 公 告',
+          [
+            `${HUANG_NAME}的雷暴散尽 · 深渊重新合上`,
+            '海面上浮起一根还在噼啪作响的银针',
+            '凡在此刻还在航行的船，都见证了一场天劫',
+          ],
+          11,
+        )
+        state.toast('黄达鑫沉下去了 · 神器【达鑫的避雷针】浮在水面，靠近按 E 收走', 'gold')
+        this.impactShake = Math.max(this.impactShake, 1.4)
+        this.world.flashLightning(1.3)
+        audio.thunder()
+      },
+      onLoot: () => {
+        useGameStore.getState().grantHuangLoot()
+      },
+    })
     this.world.setCelestialSurface((x, z, t) => this.celestial.surfaceAt(x, z, t))
     this.celestial.setRimTarget(this.boat.group)
 
@@ -913,6 +938,7 @@ export class Game {
       locked &&
       !this.creatures.introActive &&
       !this.cultivation.tribulating &&
+      !this.huang.isActive &&
       !ascending &&
       !this.travelTarget
     ) {
@@ -933,6 +959,9 @@ export class Game {
       this.lastHitAt = store.hitAt
       if (store.hitAt > 0) this.avatar.hit()
     }
+
+    if (input.consumeHuangSummon()) this.summonHuang('长按 K')
+    if (!modal) this.updateHuang(dt, time)
 
     if (store.underwater) {
       this.updateUnderwater(dt, time, store, modal)
@@ -1002,14 +1031,14 @@ export class Game {
       !store.underwater && store.contest?.phase === 'fighting' ? this.contest.opponentPosition : null
     if (duelTarget) this.combatFaceTarget.copy(duelTarget)
     const bossTarget = store.boss && !store.underwater
-      ? this.creatures.bossPosition(store.boss.id, this.combatFaceTarget)
+      ? this.bossAnchor(store.boss.id, this.combatFaceTarget)
       : duelTarget
     this.combatHasTarget = Boolean(bossTarget)
     this.avatar.group.visible = !store.underwater
     this.avatar.update(dt, this.boat, allowMove && Math.abs(this.boat.speed) > 0.6, bossTarget)
 
     if (store.boss && !store.combatCamera && !this.autoLockedBossId) {
-      const pos = this.creatures.bossPosition(store.boss.id, this.combatFaceTarget)
+      const pos = this.bossAnchor(store.boss.id, this.combatFaceTarget)
       if (pos) {
         const distance = Math.hypot(this.boat.position.x - pos.x, this.boat.position.z - pos.z)
         if (distance < 44) {
@@ -1091,7 +1120,7 @@ export class Game {
         this.boat.heading,
       )
     }
-    if (!modal && !this.cultivation.tribulating) {
+    if (!modal && !this.cultivation.tribulating && !this.huang.isActive) {
       this.creatures.update(dt, time, {
         position: this.boat.position,
         underwater: false,
@@ -1483,6 +1512,8 @@ export class Game {
     )
     const stunned = this.creatures.aoeHit(center, radius, boltDamage, 2.4, '天雷引')
     const scorched = this.contest.strike(center, radius, boltDamage)
+    const struckHuang = this.huang.hitPoint(center, radius, boltDamage)
+    if (struckHuang) this.clashOnHuang(center)
 
     let bagged = 0
     const capacity = bagCapacity(store)
@@ -1617,6 +1648,13 @@ export class Game {
     store.toast('光幕散去 · 擂台重归寂静', 'info')
   }
 
+  /** 砍中黄达鑫：他的血条已经自己更新过了，这里只补一声金铁和一团雷屑 */
+  private clashOnHuang(at: THREE.Vector3) {
+    this.world.foam.splash(at.x, at.z, 4.5, 0.7)
+    this.impactShake = Math.max(this.impactShake, 0.22)
+    audio.snap()
+  }
+
   /** 打中心魔：血条当场更新，镜像脚下炸开一团云气 */
   private contestFeedback() {
     const store = useGameStore.getState()
@@ -1696,10 +1734,88 @@ export class Game {
     }
   }
 
+  // ------------------------------------------------------------- 黄达鑫
+
+  /** 三处入口共用：长按 K、屏幕角落那个不像按钮的按钮、控制台的 summon_huang */
+  summonHuang(source: string) {
+    const store = useGameStore.getState()
+    if (this.huang.isActive) return false
+    if (store.dead || store.demon || this.demon.isActive) return false
+    if (this.contest.active || this.gate.isActive || this.crossTimer > 0) return false
+    if (this.cultivation.tribulating || this.creatures.introActive) return false
+    if (store.boss) {
+      store.toast(`${store.boss.name}还没倒 · 黄达鑫不肯插队`, 'info')
+      return false
+    }
+
+    this.fishing.reset()
+    this.seaEvents.cancel()
+    this.setSwordFlight(false)
+    this.clearWaterBullets()
+    this.attackState = null
+    this.huang.summon(this.boat.position, 2600 + store.realm * 300)
+    this.impactShake = Math.max(this.impactShake, 2.2)
+    gameEvents.emit('huang:summon', {})
+    store.setCombatCamera(true)
+    store.toast(`${source}把「${HUANG_NAME}」从天上拽了下来 · 全海域落雷`, 'danger')
+    return true
+  }
+
+  /** F8 开发者控制台的命令入口：只在这份工程里用，不进正式流程 */
+  runDevCommand(raw: string): string {
+    const [name = '', ...rest] = raw.trim().toLowerCase().split(/\s+/)
+    const store = useGameStore.getState()
+    switch (name) {
+      case 'summon_huang':
+        return this.summonHuang('作弊控制台')
+          ? '黄达鑫正在升起来 · 抓好你的船'
+          : '召唤被拒绝：先确认没有别的 Boss 在场、你也还没死'
+      case 'kill_huang':
+        if (!this.huang.isActive) return '黄达鑫不在场'
+        this.huang.hitPoint(this.huang.bodyPosition, 999, 99999)
+        return '天罚到头了'
+      case 'heal':
+        store.healPlayer(maxHpFor(store.realm))
+        return '血线拉满'
+      case 'money': {
+        const amount = Number(rest[0])
+        if (!Number.isFinite(amount)) return 'money 后面要接一个数字'
+        useGameStore.setState({ money: Math.max(0, store.money + Math.round(amount)) })
+        return `账上多了 ${Math.round(amount)} 文`
+      }
+      case 'realm': {
+        const target = Number(rest[0])
+        if (!Number.isInteger(target) || target < 0 || target > 9) return 'realm 后面接 0-9'
+        useGameStore.setState({ realm: target, hp: maxHpFor(target) })
+        return '境界已改写'
+      }
+      case 'help':
+        return '可用：summon_huang / kill_huang / heal / money <±数> / realm <0-9>'
+      default:
+        return `看不懂「${name || '空'}」· 输入 help 看指令表`
+    }
+  }
+
+  private updateHuang(dt: number, time: number) {
+    if (!this.huang.isActive && !this.huang.hasLoot) return
+    this.huang.update(dt, time, this.boat.position)
+    if (this.huang.shakeRequest > 0) {
+      this.impactShake = Math.max(this.impactShake, this.huang.shakeRequest)
+      this.huang.shakeRequest = 0
+    }
+  }
+
+  /** 镜头与自动锁向要跟的目标：黄达鑫不走 creatures 那一套 */
+  private bossAnchor(id: string, out: THREE.Vector3) {
+    if (id === HUANG_ID) return this.huang.isActive ? out.copy(this.huang.bodyPosition) : null
+    return this.creatures.bossPosition(id, out)
+  }
+
   /** 撕开心魔空间：屏幕一闪，手绘小鬼浮到船头 */
   private openDemonSpace(reason: string) {
     const store = useGameStore.getState()
     if (store.demon || this.demon.isActive) return
+    if (this.huang.isActive) return
     if (this.contest.active || this.gate.isActive || this.crossTimer > 0) return
     if (this.cultivation.tribulating || store.dead) return
 
@@ -2287,7 +2403,7 @@ export class Game {
       this.lookTarget.set(focus.x, Math.max(focus.y + 2.4, 0.8), focus.z)
       targetFov = portrait ? 66 : 56
     } else if (store.combatCamera && store.boss && !store.underwater) {
-      const bossPos = this.creatures.bossPosition(store.boss.id, this.combatTarget)
+      const bossPos = this.bossAnchor(store.boss.id, this.combatTarget)
       if (bossPos) {
         // Over-the-shoulder rig: sit behind the avatar, offset to the right, and look at the boss.
         const head = this.avatar.getHeadPosition(this.combatFaceTarget)
@@ -2357,6 +2473,17 @@ export class Game {
   private resolveInteract(store: ReturnType<typeof useGameStore.getState>) {
     if (store.underwater || this.fishing.phase !== 'idle') return null
     const boat = this.boat.position
+    if (this.huang.hasLoot) {
+      const loot = this.huang.lootPrompt(boat)
+      if (loot) {
+        return {
+          kind: 'huangloot' as const,
+          id: null,
+          prompt: `【${loot.name}】浮在水面 · 还在噼啪跳`,
+          label: '拾取',
+        }
+      }
+    }
     if (this.world.isCelestial) {
       const sect = this.sectHalls.nearestGate(boat)
       if (sect) {
@@ -2519,6 +2646,8 @@ export class Game {
     this.captureCooldown = 0
     this.clearWaterBullets()
     this.attackState = null
+    // 死了就是死了，天罚也一并收走
+    this.huang.despawn()
     // 死一次就把心魔空间清账，免得复活后还困在墨色里
     this.demon.dismiss(0.2)
     this.demonBlank = 0
@@ -2657,14 +2786,16 @@ export class Game {
       )
       const mirror = this.contest.active ? this.contest.opponentPosition : null
       const brushedMirror = Boolean(mirror && bullet.mesh.position.distanceTo(mirror) < 1.8)
+      const brushedHuang = this.huang.hitPoint(bullet.mesh.position, 1.6, bullet.damage)
       // 心魔空间里物理攻击一律无效，水弹穿过去什么也打不到
       const brushedDemon = Boolean(
         !store.demon && this.demon.isActive && bullet.mesh.position.distanceTo(this.demon.headPosition) < 2.2,
       )
-      if (hit || brushedMirror || brushedDemon) {
+      if (hit || brushedMirror || brushedDemon || brushedHuang) {
         if (brushedMirror && this.contest.strike(bullet.mesh.position, 1.8, bullet.damage)) {
           this.contestFeedback()
         }
+        if (brushedHuang) this.clashOnHuang(this.huang.headPosition)
         if (brushedDemon) this.rejectPhysicalAttacks(store)
         this.seaEvents.strike(bullet.mesh.position, this.waterBulletDir, 1.6, bullet.damage)
         this.bulletBurst(bullet.mesh.position, 0.9)
@@ -3078,13 +3209,15 @@ export class Game {
       def.damage * crewDamageMul(store.crew) * realmAttackMul(store.realm) * faction.attackMul,
     )
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
+    const huang = this.huang.hitRay(origin, this.viewDir, range, damage)
     this.seaEvents.strike(origin, this.viewDir, range, damage)
-    if (hits) this.applyLeech(damage * faction.lifesteal, `${def.name}饮血`)
+    if (hits || huang) this.applyLeech(damage * faction.lifesteal, `${def.name}饮血`)
+    if (huang) this.clashOnHuang(origin)
     if (this.contest.strike(origin, range, damage, this.viewDir)) {
       this.applyLeech(damage * faction.lifesteal, '一刀斩向心魔')
       this.contestFeedback()
     }
-    if (isOnBoat && !hits && !this.contest.active) {
+    if (isOnBoat && !hits && !huang && !this.contest.active) {
       const fish = this.findBoatFish(range, 0.1)
       if (fish) this.catchSurfaceFish(fish, 0.62)
     }
@@ -3118,9 +3251,18 @@ export class Game {
       return
     }
     const hit = this.creatures.rayHit(origin, this.viewDir, def.range, damage)
+    const huang = this.huang.hitRay(origin, this.viewDir, def.range, damage)
     this.seaEvents.strike(origin, this.viewDir, def.range, damage)
     const pierced = this.contest.strike(origin, def.range, damage, this.viewDir)
-    if (hit) this.applyLeech(damage * faction.lifesteal, '鱼枪饮血')
+    if (hit || huang) this.applyLeech(damage * faction.lifesteal, '鱼枪饮血')
+    if (huang) {
+      const mark = this.huang.headPosition
+      this.showSpearRope(mark, 0.6)
+      this.flashMuzzle(mark)
+      this.clashOnHuang(mark)
+      audio.snap()
+      return
+    }
     if (hit) {
       this.showSpearRope(hit.point)
       this.flashMuzzle(hit.point)
@@ -3282,8 +3424,11 @@ export class Game {
     }
 
     if (input.consumeDive()) {
-      if (store.boss) {
+      if (store.boss && store.boss.id !== HUANG_ID) {
         store.toggleCombatCamera()
+      } else if (store.boss && this.fishing.phase === 'idle') {
+        // 只有黄达鑫这一场允许潜下去躲：海底七丈半以上是唯一的生门之一
+        store.setUnderwater(true)
       } else if (this.world.isCelestial) {
         store.toast('天界只有云海 · 不必下潜', 'info')
       } else if (this.fishing.phase === 'idle') {
@@ -3362,6 +3507,10 @@ export class Game {
       }
       if (info.kind === 'seaevent') {
         this.seaEvents.interact()
+        return
+      }
+      if (info.kind === 'huangloot') {
+        this.huang.collectLoot()
         return
       }
       if (info.kind === 'salvage') {
@@ -3806,6 +3955,7 @@ export class Game {
     this.thunder.dispose()
     this.contest.dispose()
     this.demon.dispose()
+    this.huang.dispose()
     this.gate.dispose()
     this.achievements.dispose()
     this.post.dispose()
