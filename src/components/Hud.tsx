@@ -7,11 +7,13 @@ import {
   Droplets,
   Fish,
   Gem,
+  Home,
   Leaf,
   MapPinned,
   ScanEye,
   Shirt,
   Ship,
+  Sparkles,
   Trophy,
   Users,
   Video,
@@ -21,6 +23,7 @@ import {
 } from 'lucide-react'
 import { UNDERWATER_MODE_LABEL, bagCapacity, useGameStore } from '@/store/useGameStore'
 import { useIsTouch } from '@/hooks/useMediaQuery'
+import { input } from '@/game/input'
 import { audio } from '@/game/audio/gameAudio'
 import { baitById } from '@/game/fishing/baitTable'
 import { DAY_PERIOD_LABEL, SEASONS } from '@/game/world/seasons'
@@ -182,6 +185,7 @@ export function Hud() {
   const capacity = useGameStore((s) => bagCapacity(s))
   const zone = useGameStore((s) => s.zone)
   const immortalJade = useGameStore((s) => s.immortalJade)
+  const ascended = useGameStore((s) => s.ascended)
   const celestialZone = useGameStore((s) => s.mapZone === 'celestial')
   const phase = useGameStore((s) => s.phase)
   const underwater = useGameStore((s) => s.underwater)
@@ -361,6 +365,24 @@ export function Hud() {
               {boss ? (combatCamera ? '自由视角' : '战斗视角') : '潜水'}
               {!isTouch && <span className="text-[9px] text-foam/30">V</span>}
             </button>
+
+            {ascended && (
+              <button
+                type="button"
+                onClick={() => input.tapZone()}
+                className="glass pointer-events-auto flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[10.5px] text-foam/75 transition-colors hover:border-gold/35 hover:text-gold active:translate-y-px"
+                aria-label={celestialZone ? '传送回凡间' : '传送至天界'}
+                title={celestialZone ? '传送回凡间 (Shift+P)' : '传送至天界 (Shift+P)'}
+              >
+                {celestialZone ? (
+                  <Home className="size-3.5 text-gold/85" />
+                ) : (
+                  <Sparkles className="size-3.5 text-gold/85" />
+                )}
+                {celestialZone ? '回凡间' : '去天界'}
+                {!isTouch && <span className="text-[9px] text-foam/30">⇧P</span>}
+              </button>
+            )}
           </div>
         </div>
 

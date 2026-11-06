@@ -212,6 +212,7 @@ export class SkyPitch {
 
   private playerLocal = new THREE.Vector3(0, SKY_PITCH.deckY, SKY_PITCH.halfL - 6)
   private playerPush = new THREE.Vector2()
+  private playerVel = new THREE.Vector2()
 
   private pig = new THREE.Group()
   private pigActive = false
@@ -801,6 +802,8 @@ export class SkyPitch {
       this.deckY,
       clamp(z - this.center.z, -this.halfL + 1, this.halfL - 1),
     )
+    this.playerVel.set(0, 0)
+    this.playerPush.set(0, 0)
     this.onFoot = true
   }
 
@@ -821,17 +824,20 @@ export class SkyPitch {
     return Math.hypot(this.playerLocal.x - this.ballPos.x, this.playerLocal.z - this.ballPos.z)
   }
 
-  /** 相机-相对移动：dx 右，dz 前（屏幕里向球门方向为负） */
+  /** 屏幕方向移动：dx 右、dz 前（画面上方为 -z），相机固定朝北不跟着转 */
   movePlayer(dt: number, dx: number, dz: number, sprint: boolean) {
-    let moving = false
     const len = Math.hypot(dx, dz)
-    let speed = 0
-    if (len > 0.001) {
-      speed = sprint ? 12 : 7.6
-      this.playerLocal.x += (dx / len) * speed * dt
-      this.playerLocal.z += (dz / len) * speed * dt
-      moving = true
-    }
+    const hasInput = len > 0.001
+    const topSpeed = sprint ? 12 : 7.6
+    const targetX = hasInput ? (dx / len) * topSpeed : 0
+    const targetZ = hasInput ? (dz / len) * topSpeed : 0
+    // 起步和刹车都留一点缓冲，人物不会一格一格地跳
+    const accel = (hasInput ? 48 : 64) * dt
+    this.playerVel.x += clamp(targetX - this.playerVel.x, -accel, accel)
+    this.playerVel.y += clamp(targetZ - this.playerVel.y, -accel, accel)
+
+    this.playerLocal.x += this.playerVel.x * dt
+    this.playerLocal.z += this.playerVel.y * dt
 
     let pushed = false
     if (this.playerPush.lengthSq() > 0.0001) {
@@ -841,9 +847,17 @@ export class SkyPitch {
       pushed = true
     }
 
-    this.playerLocal.x = clamp(this.playerLocal.x, -this.halfW + 0.9, this.halfW - 0.9)
-    this.playerLocal.z = clamp(this.playerLocal.z, -this.halfL + 0.9, this.halfL - 0.9)
+    const minX = -this.halfW + 0.9
+    const maxX = this.halfW - 0.9
+    const minZ = -this.halfL + 0.9
+    const maxZ = this.halfL - 0.9
+    if (this.playerLocal.x < minX || this.playerLocal.x > maxX) this.playerVel.x = 0
+    if (this.playerLocal.z < minZ || this.playerLocal.z > maxZ) this.playerVel.y = 0
+    this.playerLocal.x = clamp(this.playerLocal.x, minX, maxX)
+    this.playerLocal.z = clamp(this.playerLocal.z, minZ, maxZ)
     this.playerLocal.y = this.deckY
+
+    const speed = this.playerVel.length()
 
     // 贴身带球：人碰到球会轻轻把球顶开
     const dxBall = this.ballPos.x - this.playerLocal.x
@@ -858,13 +872,13 @@ export class SkyPitch {
       const overlap = touch - distance
       this.playerLocal.x -= nx * overlap
       this.playerLocal.z -= nz * overlap
-      const shove = 3.4 + (moving ? 2.2 : 0)
+      const shove = 3.4 + (speed > 0.8 ? 2.2 : 0)
       this.ballVel.x = nx * shove
       this.ballVel.z = nz * shove
       this.ballPos.y = Math.max(this.ballPos.y, this.deckY + BALL_RADIUS + 0.02)
     }
 
-    return { moving, speed, pushed }
+    return { moving: hasInput || speed > 0.4, speed, input: hasInput, pushed }
   }
 
   kick(facing: number) {

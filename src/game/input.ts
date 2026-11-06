@@ -435,6 +435,10 @@ class InputController {
     return this.keys.has('shift') || this.touchSprint
   }
 
+  tapZone() {
+    this.zonePress = true
+  }
+
   tapInteract() {
     this.interactPress = true
   }

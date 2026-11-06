@@ -1046,6 +1046,13 @@ export class Game {
 
     this.syncZone(store)
     this.syncPitchHud(store)
+    // 传送按钮/Shift+P 在场上也能用：先回船再走传送阵
+    if (input.consumeZone()) {
+      if (!modal && !locked && !store.dead) {
+        if (this.onPitch) this.leavePitch(store)
+        this.beginTravel(this.world.isCelestial ? 'mortal' : 'celestial')
+      }
+    }
     this.handlePitchToggle(store)
     if (this.onPitch) {
       this.updatePitchOnFoot(dt, time, store, modal, locked)
@@ -2240,7 +2247,16 @@ export class Game {
     const dz = frozen ? 0 : -input.throttle
     const sprint = !frozen && (input.sprint || input.boost)
     const move = pitch.movePlayer(dt, dx, dz, sprint)
-    if (move.moving) this.pitchFacing = Math.atan2(-dx, -dz)
+    if (move.input) {
+      // 朝向按最短弧平滑跟随输入方向，别让镜头/模型每帧硬转
+      const target = Math.atan2(-dx, -dz)
+      let delta = target - this.pitchFacing
+      while (delta > Math.PI) delta -= Math.PI * 2
+      while (delta < -Math.PI) delta += Math.PI * 2
+      this.pitchFacing += delta * (1 - Math.exp(-dt * 14))
+      if (this.pitchFacing > Math.PI) this.pitchFacing -= Math.PI * 2
+      else if (this.pitchFacing < -Math.PI) this.pitchFacing += Math.PI * 2
+    }
     if (move.pushed) {
       this.impactShake = Math.max(this.impactShake, 0.45)
       audio.splash(0.35)
@@ -2877,28 +2893,20 @@ export class Game {
     let targetFov = portrait ? 58 : 48
 
     if (this.onPitch) {
-      // 站在球场上：越肩镜头跟着人的朝向转，始终看得见前方球门
+      // 球场镜头固定朝北：W 永远是屏幕上方，方向不会随视角打转
       const pitch = this.celestial.skyPitch
       const p = pitch.playerWorld(this.pitchPlayerWorld)
-      const fx = -Math.sin(this.pitchFacing)
-      const fz = -Math.cos(this.pitchFacing)
-      const rx = -fz
-      const rz = fx
       const back = portrait ? 11.6 : 12.8
       const shoulder = portrait ? 2.2 : 2.8
-      const camX = p.x - fx * back + rx * shoulder
-      const camZ = p.z - fz * back + rz * shoulder
+      const camX = p.x + shoulder
+      const camZ = p.z + back
       const outside = Math.max(
         0,
         Math.abs(camX - pitch.center.x) - pitch.halfW,
         Math.abs(camZ - pitch.center.z) - pitch.halfL,
       )
       this.desired.set(camX, p.y + (portrait ? 8.2 : 7.6) + outside * 0.5, camZ)
-      this.lookTarget.set(
-        p.x + fx * 5.2 + rx * 2.2,
-        p.y + 1.5,
-        p.z + fz * 5.2 + rz * 2.2,
-      )
+      this.lookTarget.set(p.x + 1.2, p.y + 1.5, p.z - 5.2)
       targetFov = portrait ? 68 : 60
     } else if (this.creatures.introActive && !store.underwater) {
       const focus = this.creatures.introFocus(this.combatTarget)
@@ -4042,10 +4050,6 @@ export class Game {
 
     if (input.consumeCrew()) {
       store.setCrewOpen(true)
-    }
-
-    if (input.consumeZone()) {
-      this.beginTravel(this.world.isCelestial ? 'mortal' : 'celestial')
     }
 
     if (input.consumeTool()) {
