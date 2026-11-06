@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { World } from '@/game/world/world'
 import type { CreatureSystem } from '@/game/creatures/creatureSystem'
 import { gameEvents } from '@/game/eventBus'
-import { useGameStore } from '@/store/useGameStore'
+import { useGameStore, zizenAttackMul } from '@/store/useGameStore'
 import { audio } from '@/game/audio/gameAudio'
 import { clamp } from '@/game/utils/math'
 import { factionOf } from '@/game/cultivation/factions'
@@ -722,9 +722,14 @@ export class CultivationManager {
     audio.thunder()
   }
 
-  /** 神通伤害吃境界与阵营双系数 */
+  /** 神通伤害吃境界与阵营双系数，叶海【自增】也一并算上 */
   private skillDamage(state: ReturnType<typeof useGameStore.getState>, base: number) {
-    return Math.round(base * realmAttackMul(state.realm) * factionOf(state.playerFaction).attackMul)
+    return Math.round(
+      base *
+        realmAttackMul(state.realm) *
+        factionOf(state.playerFaction).attackMul *
+        zizenAttackMul(state.zizen?.stacks ?? 0),
+    )
   }
 
   /** 仙人神通回血，魔人神通噬血 */

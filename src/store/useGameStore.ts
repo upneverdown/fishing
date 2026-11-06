@@ -154,6 +154,28 @@ export const MAX_HP = 100
 export function maxHpFor(realm: number) {
   return playerMaxHp(realm, MAX_HP)
 }
+
+/** 叶海状态：非空即船正泡在叶海里，纯运行时 */
+export interface LeafSeaHud {
+  inside: boolean
+}
+
+/** 【自增】祝福层数，纯运行时；离开叶海或陨落即散 */
+export const ZIZEN_MAX = 20
+export interface ZizenHud {
+  stacks: number
+  max: number
+  grantedAt: number
+}
+
+export function zizenAttackMul(stacks: number) {
+  return 1 + 0.01 * clamp(stacks, 0, ZIZEN_MAX)
+}
+
+/** 防御每层 1%：按减伤折算，二十层约莫一成六 */
+export function zizenDefenseMul(stacks: number) {
+  return 1 / (1 + 0.01 * clamp(stacks, 0, ZIZEN_MAX))
+}
 export const UNDERWATER_MODES: UnderwaterMode[] = ['dive', 'follow', 'orbit']
 export const UNDERWATER_MODE_LABEL: Record<UnderwaterMode, string> = {
   dive: '自由潜游',
@@ -437,6 +459,10 @@ interface GameStore extends PersistedProgress {
   huang: HuangHud | null
   /** 非空即胖猪大王在场，纯运行时 */
   pig: PigHud | null
+  /** 非空即船在叶海里，纯运行时 */
+  leafSea: LeafSeaHud | null
+  /** 非空即持有【自增】祝福，纯运行时 */
+  zizen: ZizenHud | null
   /** 全服公告横幅 */
   notice: ServerNotice | null
   /** 上一次吃鱼干的时刻，10 秒冷却 */
@@ -578,6 +604,8 @@ interface GameStore extends PersistedProgress {
   /** 发放黄达鑫的掉落，返回是否首次拿到避雷针 */
   grantHuangLoot: () => boolean
   setPig: (hud: PigHud | null) => void
+  setLeafSea: (hud: LeafSeaHud | null) => void
+  setZizen: (hud: ZizenHud | null) => void
   /** 发放胖猪大王的掉落，返回是否首次拿到獠牙 */
   grantPigLoot: () => boolean
   announce: (title: string, lines: string[], seconds?: number) => void
@@ -1317,6 +1345,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     epiphany: null,
     huang: null,
     pig: null,
+    leafSea: null,
+    zizen: null,
     notice: null,
     driedFishAt: 0,
 
@@ -2308,7 +2338,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
       }
       const armor = !state.underwater && state.boatSkin === 'pirate' ? 0.62 : 1
       const pressure = state.boss ? realmSuppressionMul(state.realm, state.boss.realm ?? 0) : 1
-      const dmg = Math.max(1, Math.round(amount * armor * pressure * faction.hurtMul))
+      const zizen = zizenDefenseMul(state.zizen?.stacks ?? 0)
+      const dmg = Math.max(1, Math.round(amount * armor * pressure * faction.hurtMul * zizen))
       const hp = Math.max(0, state.hp - dmg)
       if (hp <= 0) {
         const lost = Math.floor(state.bag.length / 2)
@@ -2326,6 +2357,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           boss: null,
           huang: null,
           pig: null,
+          zizen: null,
           combatCamera: false,
           inputLocked: false,
         })
@@ -2838,6 +2870,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     },
 
     setPig: (pig) => set({ pig }),
+    setLeafSea: (leafSea) => set({ leafSea }),
+    setZizen: (zizen) => set({ zizen }),
 
     /** 胖猪大王的掉落：半根獠牙，拿到手就自动磨利全部兵刃 */
     grantPigLoot: () => {
@@ -3322,6 +3356,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
         epiphany: null,
         huang: null,
         pig: null,
+        leafSea: null,
+        zizen: null,
         notice: null,
         driedFishAt: 0,
         tribulation: null,

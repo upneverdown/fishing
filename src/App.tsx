@@ -41,6 +41,7 @@ import { DemonQuizOverlay } from '@/components/DemonQuizOverlay'
 import { EpiphanyNotice } from '@/components/EpiphanyNotice'
 import { HuangOverlay } from '@/components/HuangOverlay'
 import { PigOverlay } from '@/components/PigOverlay'
+import { LeafSeaOverlay } from '@/components/LeafSeaOverlay'
 import { DevConsole } from '@/components/DevConsole'
 import { VitalHud } from '@/components/VitalHud'
 import { WeaponBar } from '@/components/WeaponBar'
@@ -106,6 +107,7 @@ export default function App() {
           <EpiphanyNotice />
           <HuangOverlay />
           <PigOverlay />
+          <LeafSeaOverlay />
           <VitalHud />
           {!underwater && <WeaponBar />}
           {underwater ? (

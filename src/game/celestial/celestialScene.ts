@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { mulberry32 } from '@/game/utils/math'
 import { bannerTexture, glowSprite, haloRing, runeRing, softSprite } from './celestialTextures'
+import { celestialSurfaceHeight, celestialWaveGLSL, CLOUD_WAVES } from './celestialWaves'
+import { LeafSea } from './leafSea'
 
 const TAU = Math.PI * 2
 
@@ -46,36 +48,7 @@ const CRANE_SLOTS = [
   { cx: 0, cz: 0, rx: 132, rz: 112, height: 32, speed: 0.031 },
 ]
 
-interface CloudWave {
-  dx: number
-  dz: number
-  length: number
-  amplitude: number
-  omega: number
-  phase: number
-}
-
-// surfaceAt() 与云海顶点位移共用同一组层结，船只才浮在视觉波峰上
-const CLOUD_WAVES: CloudWave[] = [
-  { dx: 0.928, dz: 0.372, length: 54, amplitude: 0.28, omega: 0.22, phase: 0 },
-  { dx: -0.461, dz: 0.887, length: 32, amplitude: 0.17, omega: 0.29, phase: 1.9 },
-  { dx: 0.699, dz: -0.715, length: 17.5, amplitude: 0.12, omega: 0.38, phase: 4.2 },
-]
-
-const waveGLSL = CLOUD_WAVES.map((wave) => {
-  const k = TAU / wave.length
-  return `
-  {
-    const vec2 D = vec2(${wave.dx.toFixed(6)}, ${wave.dz.toFixed(6)});
-    const float K = ${k.toFixed(6)};
-    const float A = ${wave.amplitude.toFixed(6)};
-    const float PH = ${wave.phase.toFixed(6)};
-    const float W = ${wave.omega.toFixed(6)};
-    float ph = K * dot(D, p) + PH - W * uTime;
-    disp += A * sin(ph);
-    slope += A * K * D * cos(ph);
-  }`
-}).join('\n')
+const waveGLSL = celestialWaveGLSL()
 
 const noiseGLSL = /* glsl */ `
   float hash21(vec2 p) {
@@ -540,6 +513,7 @@ export class CelestialScene {
   readonly gatePosition = new THREE.Vector3(0, 0, -70)
   readonly merchantPosition = new THREE.Vector3(34, 3.6, 26)
   readonly bossArena = { x: ARENA.x, z: ARENA.z, radius: ARENA.radius }
+  readonly leafSea: LeafSea
 
   private follow = new THREE.Group()
   private statics = new THREE.Group()
@@ -686,6 +660,10 @@ export class CelestialScene {
     this.rimLight = new THREE.PointLight('#ffd28c', 0, 30, 2)
     this.rimLight.castShadow = false
 
+    // 叶海涵川：通天神树与它的叶海，固定在天界北面
+    this.leafSea = new LeafSea()
+    this.statics.add(this.leafSea.group)
+
     this.prime()
   }
 
@@ -710,13 +688,7 @@ export class CelestialScene {
   }
 
   surfaceAt(x: number, z: number, time: number) {
-    let height = 0
-    for (const wave of CLOUD_WAVES) {
-      const k = TAU / wave.length
-      height +=
-        wave.amplitude * Math.sin(k * (wave.dx * x + wave.dz * z) + wave.phase - wave.omega * time)
-    }
-    return height
+    return celestialSurfaceHeight(x, z, time)
   }
 
   setRimTarget(target: THREE.Object3D | null) {
@@ -778,6 +750,7 @@ export class CelestialScene {
     this.updateArenaStorm(time)
     this.updateBurst(dt)
     this.updatePulses(time, dt)
+    this.leafSea.update(dt, time, center)
 
     this.crystalMat.emissiveIntensity = 1.15 + (0.5 + 0.5 * Math.sin(time * 0.55)) * 0.8
   }
@@ -795,6 +768,7 @@ export class CelestialScene {
     }
     for (const disposable of this.disposables) disposable.dispose()
     this.disposables.length = 0
+    this.leafSea.dispose()
     this.rimLight.removeFromParent()
     this.rimParent = null
     this.group.removeFromParent()

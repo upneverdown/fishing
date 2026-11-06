@@ -12,10 +12,12 @@ import { UnderwaterPost } from '@/game/render/underwaterPost'
 import { input } from '@/game/input'
 import {
   DRIED_FISH_KEY,
+  ZIZEN_MAX,
   bagCapacity,
   isModalOpen,
   maxHpFor,
   useGameStore,
+  zizenAttackMul,
 } from '@/store/useGameStore'
 import { gameEvents } from '@/game/eventBus'
 import { AchievementManager } from '@/game/achievements/achievementManager'
@@ -42,6 +44,7 @@ import {
 import { variantById, variantStats } from '@/game/capture/variants'
 import { CreatureSystem } from '@/game/creatures/creatureSystem'
 import { CelestialScene, CELESTIAL_SPAWN } from '@/game/celestial/celestialScene'
+import { LEAF_SEA } from '@/game/celestial/leafSea'
 import { AscensionGate } from '@/game/celestial/ascensionGate'
 import { boatCanFly } from '@/game/shop/catalog'
 import { CultivationManager, type CultivationPlayer } from '@/game/cultivation/cultivationManager'
@@ -187,6 +190,9 @@ export class Game {
   private travelTarget: MapZone | null = null
   private ascensionHudTimer = 0
   private celestialDoomTimer = 0
+  private leafInside = false
+  private leafHealAccum = 0
+  private zizenTimer = 0
   private flightHover = 0
   private pathPoint = new THREE.Vector3()
   private unsubAscension: (() => void) | null = null
@@ -1173,6 +1179,7 @@ export class Game {
     this.world.updateFoam(dt)
     this.underwaterWorld.updateAmbient(time, dt, this.boat.position)
     this.celestial.update(dt, time, this.boat.position)
+    this.updateLeafSea(dt, store)
     this.syncFlight(store)
     if (celestial) {
       this.seasonFx.setVisible(false)
@@ -1452,6 +1459,12 @@ export class Game {
     store.setZone(celestial ? '天界云海' : '老码头')
     store.setBoatPose({ x: pose.x, z: pose.z, heading: pose.heading })
     store.setCombatCamera(false)
+    this.leafInside = false
+    this.leafHealAccum = 0
+    this.zizenTimer = 0
+    this.boat.blessingSpeedMul = 1
+    store.setLeafSea(null)
+    store.setZizen(null)
     this.updateCamera(1, true)
     this.camPos.copy(this.camera.position)
     this.camera.getWorldDirection(this.viewDir)
@@ -1545,7 +1558,10 @@ export class Game {
     this.thunderCd = 9
 
     const boltDamage = Math.round(
-      24 * realmAttackMul(store.realm) * factionOf(store.playerFaction).attackMul,
+      24 *
+        realmAttackMul(store.realm) *
+        factionOf(store.playerFaction).attackMul *
+        this.zizenPolish(store),
     )
     const stunned = this.creatures.aoeHit(center, radius, boltDamage, 2.4, '天雷引')
     const scorched = this.contest.strike(center, radius, boltDamage)
@@ -1821,6 +1837,23 @@ export class Game {
         if (!this.pig.isActive) return '胖猪大王不在场'
         this.pig.hitPoint(this.pig.bodyPosition, 999, 99999)
         return '小山塌了'
+      case 'leafsea': {
+        if (!this.world.isCelestial) {
+          if (!store.ascended) return '凡躯进不了叶海 · 先渡劫飞升'
+          this.applyZone('celestial', true)
+        }
+        this.boat.position.set(LEAF_SEA.x, 0, LEAF_SEA.z + 32)
+        this.boat.heading = 0
+        this.boat.group.rotation.set(0, 0, 0)
+        this.updateCamera(1, true)
+        return '已落在叶海北岸 · 神树就在正前方'
+      }
+      case 'hurt': {
+        const amount = Number(rest[0])
+        if (!Number.isFinite(amount)) return 'hurt 后面要接一个数字'
+        store.damagePlayer(Math.max(1, Math.round(amount)), '控制台')
+        return `挨了 ${Math.round(amount)} 点`
+      }
       case 'heal':
         store.healPlayer(maxHpFor(store.realm))
         return '血线拉满'
@@ -1837,7 +1870,7 @@ export class Game {
         return '境界已改写'
       }
       case 'help':
-        return '可用：summon_huang / kill_huang / summon_pig / kill_pig / heal / money <±数> / realm <0-9>'
+        return '可用：summon_huang / kill_huang / summon_pig / kill_pig / leafsea / heal / hurt <数> / money <±数> / realm <0-9>'
       default:
         return `看不懂「${name || '空'}」· 输入 help 看指令表`
     }
@@ -1918,6 +1951,84 @@ export class Game {
   /** 收藏了【胖猪的獠牙】：全部兵刃都磨利一分 */
   private tuskPolish(store: ReturnType<typeof useGameStore.getState>) {
     return store.ownedWeapons.includes('pigtusk') ? 1.15 : 1
+  }
+
+  /** 【自增】祝福：每五秒一层，一层一分攻 */
+  private zizenPolish(store: ReturnType<typeof useGameStore.getState>) {
+    return zizenAttackMul(store.zizen?.stacks ?? 0)
+  }
+
+  /** 叶海涵川：细雨回春、绿色船畔灯火，以及满血才降的【自增】 */
+  private updateLeafSea(dt: number, store: ReturnType<typeof useGameStore.getState>) {
+    const sea = this.celestial.leafSea
+    const inside =
+      this.world.isCelestial &&
+      !store.dead &&
+      sea.contains(this.boat.position.x, this.boat.position.z)
+
+    if (!inside) {
+      this.leafInside = false
+      this.leafHealAccum = 0
+      this.zizenTimer = 0
+      this.boat.blessingSpeedMul = 1
+      if (store.leafSea) store.setLeafSea(null)
+      if (store.zizen) {
+        store.setZizen(null)
+        store.toast('离了叶海 · 【自增】随之散去', 'info')
+      }
+      return
+    }
+
+    if (!this.leafInside) {
+      this.leafInside = true
+      this.leafHealAccum = 0
+      store.setLeafSea({ inside: true })
+      store.toast('叶海 · 涵川的呼吸漫过船身', 'gold')
+    }
+
+    // 神树主干立在正中，别让船从树心里穿过去
+    const dx = this.boat.position.x - sea.center.x
+    const dz = this.boat.position.z - sea.center.z
+    const dist = Math.hypot(dx, dz)
+    if (dist < 12.5 && dist > 0.001) {
+      const push = 12.5 / dist
+      this.boat.position.x = sea.center.x + dx * push
+      this.boat.position.z = sea.center.z + dz * push
+    }
+
+    const maxHp = maxHpFor(store.realm)
+    if (store.hp < maxHp) {
+      this.leafHealAccum += maxHp * 0.05 * dt
+      const heal = Math.floor(this.leafHealAccum)
+      if (heal > 0) {
+        this.leafHealAccum -= heal
+        store.healPlayer(heal)
+      }
+    } else {
+      this.leafHealAccum = 0
+    }
+
+    // 生命重新圆满，涵川垂一道绿光下来
+    if (!store.zizen && store.hp >= maxHp) {
+      store.setZizen({ stacks: 0, max: ZIZEN_MAX, grantedAt: Date.now() })
+      this.zizenTimer = 0
+      sea.bless(this.boat.position.x, this.boat.position.z)
+      this.world.foam.ripple(this.boat.position.x, this.boat.position.z, 2.4)
+      audio.caught()
+    }
+
+    const zizen = useGameStore.getState().zizen
+    if (zizen) {
+      this.zizenTimer += dt
+      if (this.zizenTimer >= 5 && zizen.stacks < zizen.max) {
+        this.zizenTimer -= 5
+        const stacks = Math.min(zizen.max, zizen.stacks + 1)
+        store.setZizen({ ...zizen, stacks })
+        if (stacks === zizen.max) store.toast('自增已叠满二十层 · 生生不息', 'gold')
+      }
+    }
+
+    this.boat.blessingSpeedMul = zizenAttackMul(useGameStore.getState().zizen?.stacks ?? 0)
   }
 
   /** 镜头与自动锁向要跟的目标：黄达鑫和胖猪大王不走 creatures 那一套 */
@@ -2545,6 +2656,14 @@ export class Game {
       }
     } else {
       this.chaseTarget(portrait)
+    }
+
+    if (store.leafSea?.inside && !store.combatCamera && !store.underwater) {
+      // 叶海涵川：镜头后撤抬高、轻轻仰起，让通天神树整棵落进画面
+      this.desired.addScaledVector(forward, -18 * Math.min(this.boat.cameraScale, 1.6))
+      this.desired.y += 3.6
+      this.lookTarget.y += 13.5
+      targetFov = portrait ? 66 : 58
     }
 
     if (immediate) {
@@ -3342,7 +3461,8 @@ export class Game {
         crewDamageMul(store.crew) *
         realmAttackMul(store.realm) *
         faction.attackMul *
-        this.tuskPolish(store),
+        this.tuskPolish(store) *
+        this.zizenPolish(store),
     )
     const hits = this.creatures.meleeHit(origin, this.viewDir, range, damage)
     const huang = this.huang.hitRay(origin, this.viewDir, range, damage)
@@ -3386,7 +3506,8 @@ export class Game {
         crewDamageMul(store.crew) *
         realmAttackMul(store.realm) *
         faction.attackMul *
-        this.tuskPolish(store),
+        this.tuskPolish(store) *
+        this.zizenPolish(store),
     )
     if (def.id === 'bonestaff') {
       this.spitWaterBullet(def, origin, this.viewDir, damage)

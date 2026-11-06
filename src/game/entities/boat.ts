@@ -393,6 +393,8 @@ export class Boat {
   crewSpeedMul = 1
   stormSpeedMul = 1
   realmSpeedMul = 1
+  /** 【自增】祝福：叶海神树把船推得更快 */
+  blessingSpeedMul = 1
 
   private crewDeck: {
     y: number
@@ -2011,7 +2013,8 @@ export class Boat {
     this.boostActive = canDrive && boost && throttle > 0.1 && this.speed > 0.35
     let blockedHard = false
     if (canDrive) {
-      const speedBoost = this.crewSpeedMul * this.stormSpeedMul * this.realmSpeedMul
+      const speedBoost =
+        this.crewSpeedMul * this.stormSpeedMul * this.realmSpeedMul * this.blessingSpeedMul
       const boostMul = this.boostActive ? 1.5 : 1
       this.speed += throttle * 7.2 * this.speedMul * this.accelMul * speedBoost * boostMul * dt
       this.speed *= Math.exp(-(Math.abs(throttle) < 0.05 ? 1.15 : 0.45) * dt)
