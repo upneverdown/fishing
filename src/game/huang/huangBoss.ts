@@ -214,6 +214,7 @@ export class HuangBoss {
     this.ring = ringTexture()
     this.glow = glowTexture()
     this.group.visible = false
+    this.body.visible = false
     this.aura.castShadow = false
     this.flash.castShadow = false
     this.group.add(this.aura, this.flash)

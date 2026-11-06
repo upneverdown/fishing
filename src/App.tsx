@@ -42,6 +42,7 @@ import { EpiphanyNotice } from '@/components/EpiphanyNotice'
 import { HuangOverlay } from '@/components/HuangOverlay'
 import { PigOverlay } from '@/components/PigOverlay'
 import { LeafSeaOverlay } from '@/components/LeafSeaOverlay'
+import { SkyPitchOverlay } from '@/components/SkyPitchOverlay'
 import { DevConsole } from '@/components/DevConsole'
 import { VitalHud } from '@/components/VitalHud'
 import { WeaponBar } from '@/components/WeaponBar'
@@ -108,6 +109,7 @@ export default function App() {
           <HuangOverlay />
           <PigOverlay />
           <LeafSeaOverlay />
+          <SkyPitchOverlay />
           <VitalHud />
           {!underwater && <WeaponBar />}
           {underwater ? (

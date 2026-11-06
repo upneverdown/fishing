@@ -6,7 +6,7 @@ const HINTS = [
   { keys: ['Shift'], label: '加速冲刺' },
   { keys: ['Space'], label: '蓄力 / 抛竿' },
   { keys: ['按住', 'Space'], label: '收线' },
-  { keys: ['F'], label: '抽动假饵 / 吸收内丹' },
+  { keys: ['F'], label: '抽动假饵 / 吸收内丹 / 下船踢球' },
   { keys: ['E'], label: '码头卖鱼' },
   { keys: ['G'], label: '回小镇' },
   { keys: ['I'], label: '鱼篓' },

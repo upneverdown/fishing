@@ -6,13 +6,13 @@ import { glowSprite, haloRing, softSprite } from './celestialTextures'
 const TAU = Math.PI * 2
 
 /** 叶海在世界里的位置：天门以北，正对出生时的船头 */
-export const LEAF_SEA = { x: 0, z: 152, radius: 62 }
+export const LEAF_SEA = { x: 0, z: 152, radius: 112 }
 
 const SURFACE_LIFT = 0.34
-const LEAF_COUNT = 560
-const FIREFLY_COUNT = 240
-const FALL_COUNT = 96
-const RISE_COUNT = 110
+const LEAF_COUNT = 1250
+const FIREFLY_COUNT = 520
+const FALL_COUNT = 170
+const RISE_COUNT = 150
 const TREE_HEIGHT = 48
 
 const leafWaveGLSL = celestialWaveGLSL()

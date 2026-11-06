@@ -168,6 +168,15 @@ export interface ZizenHud {
   grantedAt: number
 }
 
+/** 仙庭球场：船靠近时浮出提示，下船后记录比分，纯运行时 */
+export interface PitchHud {
+  near: boolean
+  onFoot: boolean
+  score: number
+  goalAt: number
+  cameoAt: number
+}
+
 export function zizenAttackMul(stacks: number) {
   return 1 + 0.01 * clamp(stacks, 0, ZIZEN_MAX)
 }
@@ -463,6 +472,8 @@ interface GameStore extends PersistedProgress {
   leafSea: LeafSeaHud | null
   /** 非空即持有【自增】祝福，纯运行时 */
   zizen: ZizenHud | null
+  /** 非空即靠近/正在仙庭球场，纯运行时 */
+  pitch: PitchHud | null
   /** 全服公告横幅 */
   notice: ServerNotice | null
   /** 上一次吃鱼干的时刻，10 秒冷却 */
@@ -606,6 +617,11 @@ interface GameStore extends PersistedProgress {
   setPig: (hud: PigHud | null) => void
   setLeafSea: (hud: LeafSeaHud | null) => void
   setZizen: (hud: ZizenHud | null) => void
+  /** 进球奖励：直接往上叠【自增】，没祝福时先生成一层 */
+  addZizenStacks: (amount: number) => void
+  /** 球场奖励金币，顺手记进总收益 */
+  addMoney: (amount: number) => void
+  setPitch: (hud: PitchHud | null) => void
   /** 发放胖猪大王的掉落，返回是否首次拿到獠牙 */
   grantPigLoot: () => boolean
   announce: (title: string, lines: string[], seconds?: number) => void
@@ -1347,6 +1363,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     pig: null,
     leafSea: null,
     zizen: null,
+    pitch: null,
     notice: null,
     driedFishAt: 0,
 
@@ -2358,6 +2375,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
           huang: null,
           pig: null,
           zizen: null,
+          pitch: null,
           combatCamera: false,
           inputLocked: false,
         })
@@ -2872,6 +2890,29 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setPig: (pig) => set({ pig }),
     setLeafSea: (leafSea) => set({ leafSea }),
     setZizen: (zizen) => set({ zizen }),
+    setPitch: (pitch) => set({ pitch }),
+    addZizenStacks: (amount) => {
+      if (amount <= 0) return
+      const state = get()
+      const stacks = Math.min(ZIZEN_MAX, (state.zizen?.stacks ?? 0) + Math.round(amount))
+      set({
+        zizen: {
+          stacks,
+          max: ZIZEN_MAX,
+          grantedAt: state.zizen?.grantedAt ?? Date.now(),
+        },
+      })
+    },
+    addMoney: (amount) => {
+      if (!Number.isFinite(amount) || amount === 0) return
+      const state = get()
+      const delta = Math.round(amount)
+      set({
+        money: Math.max(0, state.money + delta),
+        totalEarned: state.totalEarned + Math.max(0, delta),
+      })
+      persist()
+    },
 
     /** 胖猪大王的掉落：半根獠牙，拿到手就自动磨利全部兵刃 */
     grantPigLoot: () => {
@@ -3358,6 +3399,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         pig: null,
         leafSea: null,
         zizen: null,
+        pitch: null,
         notice: null,
         driedFishAt: 0,
         tribulation: null,

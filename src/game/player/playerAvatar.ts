@@ -234,8 +234,26 @@ export class PlayerAvatar {
     return this.slashTimer > 0
   }
 
-  update(dt: number, boat: Boat, moving: boolean, target: THREE.Vector3 | null) {
+  update(
+    dt: number,
+    boat: Boat,
+    moving: boolean,
+    target: THREE.Vector3 | null,
+    free?: { position: THREE.Vector3; facing: number; moving: boolean; speed: number },
+  ) {
     this.idleTime += dt
+
+    if (free) {
+      this.group.position.copy(free.position)
+      let delta = free.facing - this.facing
+      while (delta > Math.PI) delta -= Math.PI * 2
+      while (delta < -Math.PI) delta += Math.PI * 2
+      this.facing += delta * (1 - Math.exp(-dt * 12))
+      this.group.rotation.y = this.facing
+      this.animate(dt, free.moving, free.speed)
+      return
+    }
+
     const spot = boat.getPlayerSpot()
     this.group.position.set(spot.x, spot.y + 0.06, spot.z)
 
@@ -252,7 +270,10 @@ export class PlayerAvatar {
     this.facing += delta * (1 - Math.exp(-dt * turnRate))
     this.group.rotation.y = this.facing
 
-    const speed = Math.abs(boat.speed)
+    this.animate(dt, moving, Math.abs(boat.speed))
+  }
+
+  private animate(dt: number, moving: boolean, speed: number) {
     const stride = Math.min(1, speed / 5)
     this.walkPhase += dt * (2.4 + speed * 1.3) * (moving ? 1 : 0.45)
     const swing = Math.sin(this.walkPhase) * (0.16 + stride * 0.42)

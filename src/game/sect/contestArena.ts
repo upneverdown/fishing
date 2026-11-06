@@ -11,8 +11,8 @@ import {
 
 const TAU = Math.PI * 2
 
-/** 擂台落在仙界地图中央偏北，避开接引仙阵与首领擂台 */
-export const CONTEST_POINT = { x: 0, z: 105 }
+/** 擂台落在叶海北岸，避开接引仙阵、天界球场与首领擂台 */
+export const CONTEST_POINT = { x: 0, z: 220 }
 export const CONTEST_RADIUS = 26
 /** 对手被击溃前会一直压着这个半径打 */
 export const CONTEST_KEEP = 6.5

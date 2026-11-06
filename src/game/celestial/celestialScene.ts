@@ -3,6 +3,7 @@ import { mulberry32 } from '@/game/utils/math'
 import { bannerTexture, glowSprite, haloRing, runeRing, softSprite } from './celestialTextures'
 import { celestialSurfaceHeight, celestialWaveGLSL, CLOUD_WAVES } from './celestialWaves'
 import { LeafSea } from './leafSea'
+import { SkyPitch } from './skyPitch'
 
 const TAU = Math.PI * 2
 
@@ -514,6 +515,7 @@ export class CelestialScene {
   readonly merchantPosition = new THREE.Vector3(34, 3.6, 26)
   readonly bossArena = { x: ARENA.x, z: ARENA.z, radius: ARENA.radius }
   readonly leafSea: LeafSea
+  readonly skyPitch: SkyPitch
 
   private follow = new THREE.Group()
   private statics = new THREE.Group()
@@ -664,6 +666,10 @@ export class CelestialScene {
     this.leafSea = new LeafSea()
     this.statics.add(this.leafSea.group)
 
+    // 天界球场：悬在叶海上的白玉球场，球赛逻辑由 Game 驱动
+    this.skyPitch = new SkyPitch()
+    this.statics.add(this.skyPitch.group)
+
     this.prime()
   }
 
@@ -769,6 +775,7 @@ export class CelestialScene {
     for (const disposable of this.disposables) disposable.dispose()
     this.disposables.length = 0
     this.leafSea.dispose()
+    this.skyPitch.dispose()
     this.rimLight.removeFromParent()
     this.rimParent = null
     this.group.removeFromParent()

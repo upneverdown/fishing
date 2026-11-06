@@ -45,6 +45,7 @@ import { variantById, variantStats } from '@/game/capture/variants'
 import { CreatureSystem } from '@/game/creatures/creatureSystem'
 import { CelestialScene, CELESTIAL_SPAWN } from '@/game/celestial/celestialScene'
 import { LEAF_SEA } from '@/game/celestial/leafSea'
+import { SKY_PITCH } from '@/game/celestial/skyPitch'
 import { AscensionGate } from '@/game/celestial/ascensionGate'
 import { boatCanFly } from '@/game/shop/catalog'
 import { CultivationManager, type CultivationPlayer } from '@/game/cultivation/cultivationManager'
@@ -193,6 +194,14 @@ export class Game {
   private leafInside = false
   private leafHealAccum = 0
   private zizenTimer = 0
+  /** 仙庭球场：人在场上的那几步，跟船完全脱钩 */
+  private onPitch = false
+  private pitchFacing = 0
+  private pitchPlayerWorld = new THREE.Vector3()
+  private pitchGoalAt = 0
+  private pitchCameoAt = 0
+  private pitchHudKey = ''
+  private kickHintTimer = 0
   private flightHover = 0
   private pathPoint = new THREE.Vector3()
   private unsubAscension: (() => void) | null = null
@@ -377,6 +386,19 @@ export class Game {
     this.boat.setAnglerVisible(false)
     this.post = new UnderwaterPost()
     this.celestial = new CelestialScene(this.scene)
+    this.celestial.skyPitch.onGoal = () => this.onPitchGoal()
+    this.celestial.skyPitch.onCameo = () => {
+      const state = useGameStore.getState()
+      this.pitchCameoAt = Date.now()
+      this.pitchHudKey = ''
+      this.syncPitchHud(state)
+      state.toast('胖猪大王撞开藤蔓冲进场内 · 快躲开！', 'danger')
+      audio.thunder()
+      this.impactShake = Math.max(this.impactShake, 0.8)
+    }
+    this.celestial.skyPitch.onPigKnock = () => {
+      useGameStore.getState().toast('胖猪大王一头把仙气足球顶飞了！', 'danger')
+    }
     this.gate = new AscensionGate(this.scene)
     this.sectHalls = new SectHalls(this.scene)
     this.thunder = new ThunderLure(this.scene)
@@ -1023,6 +1045,12 @@ export class Game {
     }
 
     this.syncZone(store)
+    this.syncPitchHud(store)
+    this.handlePitchToggle(store)
+    if (this.onPitch) {
+      this.updatePitchOnFoot(dt, time, store, modal, locked)
+      return
+    }
 
     const fishingPhase = this.fishing.phase
     const fishingBusy = fishingPhase !== 'idle' && fishingPhase !== 'charging'
@@ -1179,6 +1207,7 @@ export class Game {
     this.world.updateFoam(dt)
     this.underwaterWorld.updateAmbient(time, dt, this.boat.position)
     this.celestial.update(dt, time, this.boat.position)
+    if (celestial) this.celestial.skyPitch.update(dt, time)
     this.updateLeafSea(dt, store)
     this.syncFlight(store)
     if (celestial) {
@@ -1465,6 +1494,12 @@ export class Game {
     this.boat.blessingSpeedMul = 1
     store.setLeafSea(null)
     store.setZizen(null)
+    this.onPitch = false
+    this.celestial.skyPitch.clearPlayer()
+    this.pitchHudKey = ''
+    this.pitchGoalAt = 0
+    this.pitchCameoAt = 0
+    store.setPitch(null)
     this.updateCamera(1, true)
     this.camPos.copy(this.camera.position)
     this.camera.getWorldDirection(this.viewDir)
@@ -1848,6 +1883,18 @@ export class Game {
         this.updateCamera(1, true)
         return '已落在叶海北岸 · 神树就在正前方'
       }
+      case 'pitch': {
+        if (!this.world.isCelestial) {
+          if (!store.ascended) return '凡躯进不了球场 · 先渡劫飞升'
+          this.applyZone('celestial', true)
+        }
+        this.boat.position.set(SKY_PITCH.x, 0, SKY_PITCH.z + SKY_PITCH.halfL + 9)
+        this.boat.heading = 0
+        this.boat.group.rotation.set(0, 0, 0)
+        this.updateCamera(1, true)
+        this.mountPitch(useGameStore.getState())
+        return '已站上仙庭球场 · WASD 跑动，左键/J 踢球'
+      }
       case 'hurt': {
         const amount = Number(rest[0])
         if (!Number.isFinite(amount)) return 'hurt 后面要接一个数字'
@@ -1870,7 +1917,7 @@ export class Game {
         return '境界已改写'
       }
       case 'help':
-        return '可用：summon_huang / kill_huang / summon_pig / kill_pig / leafsea / heal / hurt <数> / money <±数> / realm <0-9>'
+        return '可用：summon_huang / kill_huang / summon_pig / kill_pig / leafsea / pitch / heal / hurt <数> / money <±数> / realm <0-9>'
       default:
         return `看不懂「${name || '空'}」· 输入 help 看指令表`
     }
@@ -1996,6 +2043,21 @@ export class Game {
       this.boat.position.z = sea.center.z + dz * push
     }
 
+    // 球场玉台悬在叶海上，船不能从台面里穿过去
+    const pitch = this.celestial.skyPitch
+    const margin = 2.4
+    const relX = this.boat.position.x - pitch.center.x
+    const relZ = this.boat.position.z - pitch.center.z
+    const gapX = pitch.halfW + margin - Math.abs(relX)
+    const gapZ = pitch.halfL + margin - Math.abs(relZ)
+    if (gapX > 0 && gapZ > 0) {
+      if (gapX < gapZ) {
+        this.boat.position.x = pitch.center.x + (relX < 0 ? -1 : 1) * (pitch.halfW + margin)
+      } else {
+        this.boat.position.z = pitch.center.z + (relZ < 0 ? -1 : 1) * (pitch.halfL + margin)
+      }
+    }
+
     const maxHp = maxHpFor(store.realm)
     if (store.hp < maxHp) {
       this.leafHealAccum += maxHp * 0.05 * dt
@@ -2029,6 +2091,201 @@ export class Game {
     }
 
     this.boat.blessingSpeedMul = zizenAttackMul(useGameStore.getState().zizen?.stacks ?? 0)
+  }
+
+  // ------------------------------------------------------------- 仙庭球场
+
+  private onPitchGoal() {
+    const store = useGameStore.getState()
+    this.pitchGoalAt = Date.now()
+    this.pitchHudKey = ''
+    store.addZizenStacks(3)
+    store.addMoney(1200)
+    store.toast('进球！仙气灌注 · 自增 +3 层 · 金币 +1200', 'gold')
+    audio.caught()
+    this.impactShake = Math.max(this.impactShake, 0.35)
+    this.syncPitchHud(store)
+  }
+
+  private pitchNear() {
+    return (
+      this.world.isCelestial &&
+      !useGameStore.getState().dead &&
+      this.celestial.skyPitch.nearDock(this.boat.position.x, this.boat.position.z)
+    )
+  }
+
+  private syncPitchHud(store: ReturnType<typeof useGameStore.getState>) {
+    const pitch = this.celestial.skyPitch
+    const near = !this.onPitch && this.pitchNear()
+    const key = `${near}|${this.onPitch}|${pitch.score}|${this.pitchGoalAt}|${this.pitchCameoAt}`
+    if (key === this.pitchHudKey) return
+    this.pitchHudKey = key
+    if (!near && !this.onPitch) {
+      if (store.pitch) store.setPitch(null)
+      return
+    }
+    store.setPitch({
+      near,
+      onFoot: this.onPitch,
+      score: pitch.score,
+      goalAt: this.pitchGoalAt,
+      cameoAt: this.pitchCameoAt,
+    })
+  }
+
+  /** 船停在球场东西两侧的边线上，别挡住南看台的镜头 */
+  private parkBoatAwayFromPitch() {
+    const pitch = this.celestial.skyPitch
+    const boat = this.boat.position
+    const side = boat.x >= pitch.center.x ? 1 : -1
+    boat.x = pitch.center.x + side * (pitch.halfW + 12)
+    boat.z = clamp(
+      boat.z,
+      pitch.center.z - pitch.halfL + 8,
+      pitch.center.z + pitch.halfL - 8,
+    )
+    this.boat.heading = side > 0 ? Math.PI / 2 : -Math.PI / 2
+    this.boat.group.rotation.y = this.boat.heading
+    this.boat.speed = 0
+  }
+
+  private mountPitch(store: ReturnType<typeof useGameStore.getState>) {
+    if (this.onPitch) return
+    if (this.huang.isActive || this.pig.isActive || store.boss) {
+      store.toast('场上还有对手 · 先收场再踢球', 'danger')
+      return
+    }
+    const pitch = this.celestial.skyPitch
+    this.fishing.reset()
+    this.seaEvents.cancel()
+    this.treasures.clearPrompt()
+    this.clearWaterBullets()
+    this.attackState = null
+
+    // 从靠船的那一侧踏上玉台，再往里走几步，别贴着球门线开局
+    const entryX = this.boat.position.x
+    const entryZ = this.boat.position.z
+    this.parkBoatAwayFromPitch()
+    const spot = pitch.boardSpot(this.pitchPlayerWorld)
+    spot.set(
+      clamp(entryX, pitch.center.x - pitch.halfW + 14, pitch.center.x + pitch.halfW - 14),
+      pitch.deckY,
+      clamp(entryZ, pitch.center.z - pitch.halfL + 14, pitch.center.z + pitch.halfL - 14),
+    )
+    pitch.placePlayer(spot.x, spot.z)
+
+    this.onPitch = true
+    this.pitchFacing = 0
+    this.kickHintTimer = 0
+    this.pitchHudKey = ''
+    input.clearQueued()
+
+    this.avatar.group.visible = true
+    this.avatar.update(0.8, this.boat, false, null, {
+      position: spot,
+      facing: 0,
+      moving: false,
+      speed: 0,
+    })
+    this.weaponRig.visible = false
+    store.setCombatCamera(false)
+    store.setBoss(null)
+    store.setInputLocked(false)
+    store.toast('下船进场 · WASD 跑动，左键/J 踢球', 'gold')
+    audio.caught()
+    this.syncPitchHud(store)
+    this.updateCamera(1, true)
+  }
+
+  private leavePitch(store: ReturnType<typeof useGameStore.getState>) {
+    if (!this.onPitch) return
+    this.onPitch = false
+    this.celestial.skyPitch.clearPlayer()
+    this.weaponRig.visible = true
+    this.pitchHudKey = ''
+    input.clearQueued()
+    store.setPitch(null)
+    store.toast('回到船上 · 继续赶路', 'info')
+    audio.splash(0.2)
+  }
+
+  private handlePitchToggle(store: ReturnType<typeof useGameStore.getState>) {
+    if (!this.world.isCelestial || store.dead) return
+    if (!this.onPitch && !this.pitchNear()) return
+    if (!input.consumeTool()) return
+    if (this.onPitch) {
+      this.leavePitch(store)
+      return
+    }
+    if (this.fishing.phase !== 'idle') {
+      store.toast('先收线，再下船踢球', 'info')
+      return
+    }
+    this.mountPitch(store)
+  }
+
+  private updatePitchOnFoot(
+    dt: number,
+    time: number,
+    store: ReturnType<typeof useGameStore.getState>,
+    modal: boolean,
+    locked: boolean,
+  ) {
+    const pitch = this.celestial.skyPitch
+    const frozen = modal || locked || store.dead
+    this.kickHintTimer = Math.max(0, this.kickHintTimer - dt)
+
+    const dx = frozen ? 0 : input.steer
+    const dz = frozen ? 0 : -input.throttle
+    const sprint = !frozen && (input.sprint || input.boost)
+    const move = pitch.movePlayer(dt, dx, dz, sprint)
+    if (move.moving) this.pitchFacing = Math.atan2(-dx, -dz)
+    if (move.pushed) {
+      this.impactShake = Math.max(this.impactShake, 0.45)
+      audio.splash(0.35)
+    }
+
+    const spot = pitch.playerWorld(this.pitchPlayerWorld)
+    this.avatar.group.visible = true
+    this.avatar.update(dt, this.boat, false, null, {
+      position: spot,
+      facing: this.pitchFacing,
+      moving: move.moving,
+      speed: move.speed,
+    })
+    this.weaponRig.visible = false
+
+    if (!frozen && (input.consumeFire() || input.consumeKnife())) {
+      input.cancelActionPress()
+      const distance = pitch.playerDistanceToBall()
+      const result = pitch.kick(this.pitchFacing)
+      if (result.kicked) {
+        this.avatar.slash()
+        audio.snap()
+        this.impactShake = Math.max(this.impactShake, 0.18)
+      } else if (distance > 3.4 && this.kickHintTimer <= 0) {
+        this.kickHintTimer = 3
+        store.toast('再靠近仙气足球一点', 'info')
+      }
+    }
+
+    // 人在场上，船就泊在旁边随云起伏
+    this.boat.update(dt, time, this.world, 0, 0, false)
+    this.crewSystem.update(dt, time)
+    this.world.update(time, dt, this.boat.position)
+    this.world.updateFoam(dt)
+    this.celestial.update(dt, time, this.boat.position)
+    pitch.update(dt, time)
+    this.factionAura.update(
+      time,
+      dt,
+      this.auraCenter.set(spot.x, spot.y + 0.9, spot.z),
+    )
+    this.updateCamera(dt, false)
+    this.updateStatus(dt, modal, false)
+    this.updateNav(dt, store)
+    this.syncPitchHud(store)
   }
 
   /** 镜头与自动锁向要跟的目标：黄达鑫和胖猪大王不走 creatures 那一套 */
@@ -2619,7 +2876,31 @@ export class Game {
     const portrait = this.camera.aspect < 0.85
     let targetFov = portrait ? 58 : 48
 
-    if (this.creatures.introActive && !store.underwater) {
+    if (this.onPitch) {
+      // 站在球场上：越肩镜头跟着人的朝向转，始终看得见前方球门
+      const pitch = this.celestial.skyPitch
+      const p = pitch.playerWorld(this.pitchPlayerWorld)
+      const fx = -Math.sin(this.pitchFacing)
+      const fz = -Math.cos(this.pitchFacing)
+      const rx = -fz
+      const rz = fx
+      const back = portrait ? 11.6 : 12.8
+      const shoulder = portrait ? 2.2 : 2.8
+      const camX = p.x - fx * back + rx * shoulder
+      const camZ = p.z - fz * back + rz * shoulder
+      const outside = Math.max(
+        0,
+        Math.abs(camX - pitch.center.x) - pitch.halfW,
+        Math.abs(camZ - pitch.center.z) - pitch.halfL,
+      )
+      this.desired.set(camX, p.y + (portrait ? 8.2 : 7.6) + outside * 0.5, camZ)
+      this.lookTarget.set(
+        p.x + fx * 5.2 + rx * 2.2,
+        p.y + 1.5,
+        p.z + fz * 5.2 + rz * 2.2,
+      )
+      targetFov = portrait ? 68 : 60
+    } else if (this.creatures.introActive && !store.underwater) {
       const focus = this.creatures.introFocus(this.combatTarget)
       const angle = Math.atan2(this.boat.position.x - focus.x, this.boat.position.z - focus.z)
       this.desired.set(
@@ -2658,12 +2939,20 @@ export class Game {
       this.chaseTarget(portrait)
     }
 
-    if (store.leafSea?.inside && !store.combatCamera && !store.underwater) {
-      // 叶海涵川：镜头后撤抬高、轻轻仰起，让通天神树整棵落进画面
-      this.desired.addScaledVector(forward, -18 * Math.min(this.boat.cameraScale, 1.6))
-      this.desired.y += 3.6
-      this.lookTarget.y += 13.5
-      targetFov = portrait ? 66 : 58
+    if (!this.onPitch && store.leafSea?.inside && !store.combatCamera && !store.underwater) {
+      // 球场附近收敛一点，别为了看神树把整块场地推出画面
+      const nearPitch = this.celestial.skyPitch.contains(
+        this.boat.position.x,
+        this.boat.position.z,
+        26,
+      )
+      if (!nearPitch && this.celestial.leafSea.distanceToHeart(this.boat.position.x, this.boat.position.z) < 96) {
+        // 叶海涵川：镜头后撤抬高、轻轻仰起，让通天神树整棵落进画面
+        this.desired.addScaledVector(forward, -18 * Math.min(this.boat.cameraScale, 1.6))
+        this.desired.y += 3.6
+        this.lookTarget.y += 13.5
+        targetFov = portrait ? 66 : 58
+      }
     }
 
     if (immediate) {
@@ -2731,6 +3020,15 @@ export class Game {
       }
     }
     if (this.world.isCelestial) {
+      const pitch = this.celestial.skyPitch
+      if (!this.onPitch && pitch.nearDock(boat.x, boat.z)) {
+        return {
+          kind: 'pitch' as const,
+          id: null,
+          prompt: '仙庭球场 · 按 F 下船踢球',
+          label: null,
+        }
+      }
       const sect = this.sectHalls.nearestGate(boat)
       if (sect) {
         const elder = SECT_ELDERS[sect.faction]
@@ -2855,9 +3153,13 @@ export class Game {
     }
 
     const info = modal ? null : this.resolveInteract(store)
-    const prompt = info?.prompt ?? null
-    const label = info?.label ?? null
-    const nearDock = info?.kind === 'market' && store.bag.length > 0
+    const prompt = this.onPitch
+      ? modal
+        ? null
+        : '球场 · WASD 跑动，左键/J 踢球，F 回船'
+      : info?.prompt ?? null
+    const label = this.onPitch ? null : info?.label ?? null
+    const nearDock = !this.onPitch && info?.kind === 'market' && store.bag.length > 0
     if (nearDock !== this.lastNearDock) {
       this.lastNearDock = nearDock
       store.setNearDock(nearDock)
@@ -2919,6 +3221,14 @@ export class Game {
     this.rope.visible = false
     this.seaEvents.cancel()
     this.treasures.clearPrompt()
+    // 死在球场（或中途复活）时把人和球一起收走
+    this.onPitch = false
+    this.celestial.skyPitch.clearPlayer()
+    this.pitchHudKey = ''
+    this.pitchGoalAt = 0
+    this.pitchCameoAt = 0
+    this.weaponRig.visible = true
+    store.setPitch(null)
   }
 
   private updateWeapon(
@@ -3751,6 +4061,10 @@ export class Game {
       const info = this.resolveInteract(store)
       if (!info) {
         if (skillUnlocked(SKILLS[1], store.realm)) this.cultivation.castFire(this.cultPlayer)
+        return
+      }
+      if (info.kind === 'pitch') {
+        this.mountPitch(store)
         return
       }
       if (info.kind === 'sect') {
